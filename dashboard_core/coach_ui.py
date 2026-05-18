@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 from dash import ALL, Input, Output, State, ctx, dcc, html, no_update
@@ -69,9 +69,9 @@ def register(app):
     def _new_thread(history: list | None = None) -> dict:
         h = list(history or [])
         return {
-            'id':      uuid.uuid4().hex[:12],
-            'title':   _thread_title(h),
-            'created': datetime.now(datetime.UTC).isoformat(),
+            'id': uuid.uuid4().hex[:12],
+            'title': _thread_title(h),
+            'created': datetime.now(timezone.utc).isoformat(),
             'history': h,
         }
 
