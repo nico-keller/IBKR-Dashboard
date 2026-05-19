@@ -52,11 +52,11 @@ from styles import (
 # few seconds to establish its socket, and up to ~15 s per port if it has
 # to fall through to a second candidate. Once we've connected successfully
 # at least once, we drop the grace period and report the real status.
-_APP_START        = time.time()
-_STARTUP_GRACE_S  = 25
-_EVER_CONNECTED   = False
+_APP_START = time.time()
+_STARTUP_GRACE_S = 25
+_EVER_CONNECTED = False
 
-_REFRESH_MS = cfg['dashboard']['refresh_interval_seconds'] * 1000
+_REFRESH_MS = cfg["dashboard"]["refresh_interval_seconds"] * 1000
 
 
 def register(app):
@@ -95,9 +95,9 @@ def register(app):
         # We need *some* output; writing to kb-refresh-btn.disabled is
         # harmless (the button is hidden and never actually disabled by any
         # other callback).
-        Output('kb-refresh-btn', 'disabled'),
+        Output("kb-refresh-btn", "disabled"),
         # app-root.id is a static string — it fires exactly once on mount.
-        Input('app-root', 'id'),
+        Input("app-root", "id"),
     )
 
     # ── Fast poll: update attempt counter every 4 s while connecting ─────────
@@ -107,57 +107,55 @@ def register(app):
     # ('connecting:N') so each increment changes the store value and forces
     # update_status to re-fire even though the base status hasn't changed.
     @app.callback(
-        Output('connection-status', 'data', allow_duplicate=True),
-        Input('fast-connect-poll', 'n_intervals'),
-        State('connection-status', 'data'),
+        Output("connection-status", "data", allow_duplicate=True),
+        Input("fast-connect-poll", "n_intervals"),
+        State("connection-status", "data"),
         prevent_initial_call=True,
     )
     def poll_connect_attempt(_, current_status):
-        base = (current_status or '').split(':')[0]
-        if base not in ('connecting', 'loading'):
+        base = (current_status or "").split(":")[0]
+        if base not in ("connecting", "loading"):
             return no_update
         real = connection_status()
-        if real != 'connected' and not _EVER_CONNECTED \
-                and (time.time() - _APP_START) < _STARTUP_GRACE_S:
-            return f'connecting:{connection_attempt()}'
+        if real != "connected" and not _EVER_CONNECTED and (time.time() - _APP_START) < _STARTUP_GRACE_S:
+            return f"connecting:{connection_attempt()}"
         # Grace period just expired — push the real status immediately so the
         # banner switches within 4 s instead of waiting for the 60 s tick.
-        if base in ('connecting', 'loading') and not _EVER_CONNECTED:
+        if base in ("connecting", "loading") and not _EVER_CONNECTED:
             return real
         return no_update
 
     # ── Data fetch ────────────────────────────────────────────────────────────
     @app.callback(
-        Output('portfolio-data', 'data'),
-        Output('connection-status', 'data'),
-        Input('refresh-interval', 'n_intervals'),
-        Input('startup-interval', 'n_intervals'),  # fires once at 2 s to catch post-restart timing
-        Input('kb-refresh-btn', 'n_clicks'),       # triggered when user presses R
+        Output("portfolio-data", "data"),
+        Output("connection-status", "data"),
+        Input("refresh-interval", "n_intervals"),
+        Input("startup-interval", "n_intervals"),  # fires once at 2 s to catch post-restart timing
+        Input("kb-refresh-btn", "n_clicks"),  # triggered when user presses R
     )
     def fetch_data(*_):
         global _EVER_CONNECTED
         raw = fetch_all_data()
-        if not raw or not raw['positions']:
+        if not raw or not raw["positions"]:
             if raw is not None:
                 _EVER_CONNECTED = True
-                return {}, 'no_positions'
+                return {}, "no_positions"
             real = connection_status()
-            if real != 'connected' and not _EVER_CONNECTED \
-                    and (time.time() - _APP_START) < _STARTUP_GRACE_S:
-                return {}, f'connecting:{connection_attempt()}'
+            if real != "connected" and not _EVER_CONNECTED and (time.time() - _APP_START) < _STARTUP_GRACE_S:
+                return {}, f"connecting:{connection_attempt()}"
             return {}, real
         _EVER_CONNECTED = True
-        df = process_positions(raw['positions'], raw.get('market_data', {}))
+        df = process_positions(raw["positions"], raw.get("market_data", {}))
         if df.empty:
-            return {}, 'no_positions'
+            return {}, "no_positions"
         summary = get_summary(df)
         # IBKR tick-59 data first; yfinance fills any gaps.
         # Run with a 2 s timeout so a slow Yahoo Finance response doesn't block
         # the portfolio-data store.  The background thread keeps running and
         # populates the 4-hour cache, so the next 60 s tick picks it up.
-        div_data = raw.get('div_data', {})
-        tickers  = [p['ticker'] for p in raw['positions']]
-        missing  = [t for t in tickers if t not in div_data]
+        div_data = raw.get("div_data", {})
+        tickers = [p["ticker"] for p in raw["positions"]]
+        missing = [t for t in tickers if t not in div_data]
         if missing:
             _ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             _fut = _ex.submit(get_dividend_data_yf, missing)
@@ -167,50 +165,58 @@ def register(app):
             except Exception:
                 pass
         return {
-            'positions': df.to_dict('records'),
-            'summary':   summary,
-            'account':   raw['account'],
-            'div_data':  div_data,
-        }, 'connected'
+            "positions": df.to_dict("records"),
+            "summary": summary,
+            "account": raw["account"],
+            "div_data": div_data,
+        }, "connected"
 
     # ── Status banner + connection badge ──────────────────────────────────────
     @app.callback(
-        Output('status-banner', 'children'),
-        Output('connection-badge', 'children'),
-        Output('last-updated', 'children'),
-        Output('portfolio-title', 'children'),
-        Output('retry-connection-wrap', 'style'),
-        Output('exit-demo-wrap', 'style'),
-        Output('export-pdf-wrap', 'style'),
-        Input('connection-status', 'data'),
-        Input('portfolio-data', 'data'),
+        Output("status-banner", "children"),
+        Output("connection-badge", "children"),
+        Output("last-updated", "children"),
+        Output("portfolio-title", "children"),
+        Output("retry-connection-wrap", "style"),
+        Output("exit-demo-wrap", "style"),
+        Output("export-pdf-wrap", "style"),
+        Input("connection-status", "data"),
+        Input("portfolio-data", "data"),
     )
     def update_status(status, data):
         ts = f"Updated {datetime.now().strftime('%H:%M:%S')}"
-        retry_hidden = {'display': 'none', 'textAlign': 'center', 'marginBottom': '24px'}
-        retry_shown  = {'display': 'block', 'textAlign': 'center', 'marginBottom': '24px'}
-        exit_demo_hidden = {'display': 'none'}
-        exit_demo_shown  = {'display': 'block'}
-        pdf_hidden = {'display': 'none'}
-        pdf_shown  = {'display': 'block'}
+        retry_hidden = {"display": "none", "textAlign": "center", "marginBottom": "24px"}
+        retry_shown = {"display": "block", "textAlign": "center", "marginBottom": "24px"}
+        exit_demo_hidden = {"display": "none"}
+        exit_demo_shown = {"display": "block"}
+        pdf_hidden = {"display": "none"}
+        pdf_shown = {"display": "block"}
         demo = is_demo_mode()
 
         # status may be 'loading', 'connecting', or 'connecting:N' (N = attempt count)
-        base_status = status.split(':')[0] if status else ''
-        raw_attempt  = int(status.split(':')[1]) if status and ':' in status else None
+        base_status = status.split(":")[0] if status else ""
+        raw_attempt = int(status.split(":")[1]) if status and ":" in status else None
 
-        if base_status in ('loading', 'connecting'):
-            spinner = html.Div(className='ibkr-spinner', style={
-                'width': '36px', 'height': '36px', 'margin': '0 auto 24px',
-                'border': '3px solid #e5e7eb', 'borderTop': f'3px solid {COLOR_GOOD}',
-                'borderRadius': '50%',
-            })
-            dots = html.Span([
-                html.Span(".", className='conn-dot', style={'animationDelay': '0s'}),
-                html.Span(".", className='conn-dot', style={'animationDelay': '0.3s'}),
-                html.Span(".", className='conn-dot', style={'animationDelay': '0.6s'}),
-            ])
-            if base_status == 'loading':
+        if base_status in ("loading", "connecting"):
+            spinner = html.Div(
+                className="ibkr-spinner",
+                style={
+                    "width": "36px",
+                    "height": "36px",
+                    "margin": "0 auto 24px",
+                    "border": "3px solid #e5e7eb",
+                    "borderTop": f"3px solid {COLOR_GOOD}",
+                    "borderRadius": "50%",
+                },
+            )
+            dots = html.Span(
+                [
+                    html.Span(".", className="conn-dot", style={"animationDelay": "0s"}),
+                    html.Span(".", className="conn-dot", style={"animationDelay": "0.3s"}),
+                    html.Span(".", className="conn-dot", style={"animationDelay": "0.6s"}),
+                ]
+            )
+            if base_status == "loading":
                 title_content = "Starting dashboard…"
                 body = "Loading your portfolio. This takes a few seconds."
                 attempt_line = None
@@ -220,63 +226,136 @@ def register(app):
                 if raw_attempt is not None:
                     attempt_line = html.P(
                         [f"Attempt {raw_attempt + 1} ", dots],
-                        style={'fontSize': '13px', 'color': COLOR_TEXT_MUTED,
-                               'margin': '8px 0 0', 'fontWeight': '600',
-                               'letterSpacing': '0.03em'},
+                        style={
+                            "fontSize": "13px",
+                            "color": COLOR_TEXT_MUTED,
+                            "margin": "8px 0 0",
+                            "fontWeight": "600",
+                            "letterSpacing": "0.03em",
+                        },
                     )
                 else:
                     attempt_line = None
-            banner = html.Div([
-                spinner,
-                html.P(title_content, style={'fontSize': '18px', 'fontWeight': '600',
-                                     'color': COLOR_TEXT_STRONG, 'margin': '0',
-                                     'letterSpacing': '-0.3px'}),
-                html.P(body, style={'fontSize': '14px', 'color': COLOR_TEXT_MUTED,
-                                    'margin': '6px 0 0', 'lineHeight': '1.5'}),
-                *([attempt_line] if attempt_line else []),
-            ], style={'textAlign': 'center', 'padding': '52px 40px',
-                      'background': COLOR_SURFACE_SOFT, 'borderRadius': '14px',
-                      'border': f'0.5px solid {COLOR_BORDER}'})
-            return banner, badge("Connecting...", COLOR_TEXT_MUTED, COLOR_SURFACE, COLOR_BORDER_STRONG), "", "Portfolio", retry_hidden, exit_demo_hidden, pdf_hidden
+            banner = html.Div(
+                [
+                    spinner,
+                    html.P(
+                        title_content,
+                        style={
+                            "fontSize": "18px",
+                            "fontWeight": "600",
+                            "color": COLOR_TEXT_STRONG,
+                            "margin": "0",
+                            "letterSpacing": "-0.3px",
+                        },
+                    ),
+                    html.P(
+                        body,
+                        style={
+                            "fontSize": "14px",
+                            "color": COLOR_TEXT_MUTED,
+                            "margin": "6px 0 0",
+                            "lineHeight": "1.5",
+                        },
+                    ),
+                    *([attempt_line] if attempt_line else []),
+                ],
+                style={
+                    "textAlign": "center",
+                    "padding": "52px 40px",
+                    "background": COLOR_SURFACE_SOFT,
+                    "borderRadius": "14px",
+                    "border": f"0.5px solid {COLOR_BORDER}",
+                },
+            )
+            return (
+                banner,
+                badge("Connecting...", COLOR_TEXT_MUTED, COLOR_SURFACE, COLOR_BORDER_STRONG),
+                "",
+                "Portfolio",
+                retry_hidden,
+                exit_demo_hidden,
+                pdf_hidden,
+            )
 
-        if status == 'disconnected':
-            return status_banner("🔌", "Not connected to IBKR",
-                                 "Make sure IB Gateway or TWS is open and logged in — the dashboard auto-detects the port and reconnects automatically.\n"
-                                 "IB Gateway: Configure → Settings → API → Settings → Enable ActiveX and Socket Clients (Port 4002 paper / 4001 live).\n"
-                                 "TWS: Edit → Global Configuration → API → Settings → Enable ActiveX and Socket Clients (Port 7497 paper / 7496 live).",
-                                 COLOR_BAD_BG), \
-                   badge("● Disconnected", COLOR_BAD, COLOR_BAD_BG, '#fecaca'), ts, "Portfolio", retry_shown, exit_demo_hidden, pdf_hidden
+        if status == "disconnected":
+            return (
+                status_banner(
+                    "🔌",
+                    "Not connected to IBKR",
+                    "Make sure IB Gateway or TWS is open and logged in — the dashboard auto-detects the port and reconnects automatically.\n"
+                    "IB Gateway: Configure → Settings → API → Settings → Enable ActiveX and Socket Clients (Port 4002 paper / 4001 live).\n"
+                    "TWS: Edit → Global Configuration → API → Settings → Enable ActiveX and Socket Clients (Port 7497 paper / 7496 live).",
+                    COLOR_BAD_BG,
+                ),
+                badge("● Disconnected", COLOR_BAD, COLOR_BAD_BG, "#fecaca"),
+                ts,
+                "Portfolio",
+                retry_shown,
+                exit_demo_hidden,
+                pdf_hidden,
+            )
 
-        if status == 'no_positions':
-            conn_badge = (badge("● Demo mode", COLOR_WARN_DEEP, COLOR_WARN_BG, COLOR_WARN_BORDER, 'badge-warn') if demo
-                          else badge("● Connected", COLOR_GOOD, COLOR_GOOD_BG, COLOR_GOOD_MEDIUM))
-            return status_banner("📭", "No positions found",
-                                 "Connected to IBKR successfully, but your account has no open positions.", COLOR_SURFACE_SOFT), \
-                   conn_badge, ts, "Sample portfolio" if demo else "Portfolio", retry_hidden, (exit_demo_shown if demo else exit_demo_hidden), pdf_hidden
+        if status == "no_positions":
+            conn_badge = (
+                badge("● Demo mode", COLOR_WARN_DEEP, COLOR_WARN_BG, COLOR_WARN_BORDER, "badge-warn")
+                if demo
+                else badge("● Connected", COLOR_GOOD, COLOR_GOOD_BG, COLOR_GOOD_MEDIUM)
+            )
+            return (
+                status_banner(
+                    "📭",
+                    "No positions found",
+                    "Connected to IBKR successfully, but your account has no open positions.",
+                    COLOR_SURFACE_SOFT,
+                ),
+                conn_badge,
+                ts,
+                "Sample portfolio" if demo else "Portfolio",
+                retry_hidden,
+                (exit_demo_shown if demo else exit_demo_hidden),
+                pdf_hidden,
+            )
 
         if demo:
-            return None, badge("● Demo mode", COLOR_WARN_DEEP, COLOR_WARN_BG, COLOR_WARN_BORDER, 'badge-warn'), "", "Sample portfolio", retry_hidden, exit_demo_shown, pdf_shown
-        return None, badge(f"● Live · {_REFRESH_MS // 1000}s", COLOR_GOOD, COLOR_GOOD_BG, COLOR_GOOD_MEDIUM), ts, "Portfolio", retry_hidden, exit_demo_hidden, pdf_shown
+            return (
+                None,
+                badge("● Demo mode", COLOR_WARN_DEEP, COLOR_WARN_BG, COLOR_WARN_BORDER, "badge-warn"),
+                "",
+                "Sample portfolio",
+                retry_hidden,
+                exit_demo_shown,
+                pdf_shown,
+            )
+        return (
+            None,
+            badge(f"● Live · {_REFRESH_MS // 1000}s", COLOR_GOOD, COLOR_GOOD_BG, COLOR_GOOD_MEDIUM),
+            ts,
+            "Portfolio",
+            retry_hidden,
+            exit_demo_hidden,
+            pdf_shown,
+        )
 
     @app.callback(
-        Output('main-content-area', 'style'),
-        Input('connection-status', 'data'),
+        Output("main-content-area", "style"),
+        Input("connection-status", "data"),
     )
     def toggle_main_content(status):
-        if (status or '').split(':')[0] == 'disconnected':
-            return {'display': 'none'}
+        if (status or "").split(":")[0] == "disconnected":
+            return {"display": "none"}
         return {}
 
     @app.callback(
-        Output('connection-status', 'data', allow_duplicate=True),
-        Input('retry-connection-btn', 'n_clicks'),
+        Output("connection-status", "data", allow_duplicate=True),
+        Input("retry-connection-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def retry_connection(n_clicks):
         if not n_clicks:
             return no_update
         ensure_connection_started()  # starts thread if demo just exited, else request_retry
-        return 'connecting:0'
+        return "connecting:0"
 
     # ── Demo mode toggle ──────────────────────────────────────────────────────
     # The two buttons write to kb-refresh-btn.n_clicks to piggyback on
@@ -284,23 +363,23 @@ def register(app):
     # the new demo flag so the user sees the portfolio populate (or clear)
     # without waiting for the 60-second refresh tick.
     @app.callback(
-        Output('kb-refresh-btn', 'n_clicks', allow_duplicate=True),
-        Output('connection-status', 'data', allow_duplicate=True),
-        Input('try-demo-btn', 'n_clicks'),
-        State('kb-refresh-btn', 'n_clicks'),
+        Output("kb-refresh-btn", "n_clicks", allow_duplicate=True),
+        Output("connection-status", "data", allow_duplicate=True),
+        Input("try-demo-btn", "n_clicks"),
+        State("kb-refresh-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def enable_demo(n, cur):
         if not n:
             return no_update, no_update
         set_demo_mode(True)
-        return (cur or 0) + 1, 'connected'
+        return (cur or 0) + 1, "connected"
 
     @app.callback(
-        Output('kb-refresh-btn', 'n_clicks', allow_duplicate=True),
-        Output('connection-status', 'data', allow_duplicate=True),
-        Input('exit-demo-btn', 'n_clicks'),
-        State('kb-refresh-btn', 'n_clicks'),
+        Output("kb-refresh-btn", "n_clicks", allow_duplicate=True),
+        Output("connection-status", "data", allow_duplicate=True),
+        Input("exit-demo-btn", "n_clicks"),
+        State("kb-refresh-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def disable_demo(n, cur):
@@ -316,47 +395,49 @@ def register(app):
     # swaps the active portfolio and triggers an immediate refresh by bumping
     # kb-refresh-btn — the same trick the demo-toggle buttons use.
     @app.callback(
-        Output('demo-portfolio-switcher', 'children'),
-        Output('demo-portfolio-switcher', 'style'),
-        Input('connection-status', 'data'),
-        Input('demo-portfolio-id', 'data'),
+        Output("demo-portfolio-switcher", "children"),
+        Output("demo-portfolio-switcher", "style"),
+        Input("connection-status", "data"),
+        Input("demo-portfolio-id", "data"),
     )
     def render_demo_switcher(_status, active_id):
         if not is_demo_mode():
-            return [], {'display': 'none'}
-        active_id = active_id or 'balanced'
+            return [], {"display": "none"}
+        active_id = active_id or "balanced"
         pills = []
         for p in DEMO_PORTFOLIOS:
-            is_active = p['id'] == active_id
-            pills.append(html.Button(
-                p['name'],
-                id={'type': 'demo-portfolio-btn', 'index': p['id']},
-                n_clicks=0,
-                title=p['description'],
-                style={
-                    'fontSize':     '12px',
-                    'fontWeight':   '600' if is_active else '500',
-                    'color':        COLOR_WARN_DEEP if is_active else COLOR_TEXT_MUTED,
-                    'background':   COLOR_WARN_BG  if is_active else COLOR_SURFACE,
-                    'border':       f"0.5px solid {COLOR_WARN_BORDER if is_active else COLOR_BORDER}",
-                    'borderRadius': '999px',
-                    'padding':      '4px 12px',
-                    'cursor':       'pointer',
-                    'lineHeight':   '1.4',
-                },
-            ))
+            is_active = p["id"] == active_id
+            pills.append(
+                html.Button(
+                    p["name"],
+                    id={"type": "demo-portfolio-btn", "index": p["id"]},
+                    n_clicks=0,
+                    title=p["description"],
+                    style={
+                        "fontSize": "12px",
+                        "fontWeight": "600" if is_active else "500",
+                        "color": COLOR_WARN_DEEP if is_active else COLOR_TEXT_MUTED,
+                        "background": COLOR_WARN_BG if is_active else COLOR_SURFACE,
+                        "border": f"0.5px solid {COLOR_WARN_BORDER if is_active else COLOR_BORDER}",
+                        "borderRadius": "999px",
+                        "padding": "4px 12px",
+                        "cursor": "pointer",
+                        "lineHeight": "1.4",
+                    },
+                )
+            )
         return pills, {
-            'display':    'inline-flex',
-            'gap':        '6px',
-            'alignItems': 'center',
+            "display": "inline-flex",
+            "gap": "6px",
+            "alignItems": "center",
         }
 
     @app.callback(
-        Output('demo-portfolio-id', 'data'),
-        Output('kb-refresh-btn', 'n_clicks', allow_duplicate=True),
-        Input({'type': 'demo-portfolio-btn', 'index': ALL}, 'n_clicks'),
-        State('demo-portfolio-id', 'data'),
-        State('kb-refresh-btn', 'n_clicks'),
+        Output("demo-portfolio-id", "data"),
+        Output("kb-refresh-btn", "n_clicks", allow_duplicate=True),
+        Input({"type": "demo-portfolio-btn", "index": ALL}, "n_clicks"),
+        State("demo-portfolio-id", "data"),
+        State("kb-refresh-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def select_demo_portfolio(n_clicks_list, current_id, cur_refresh):
@@ -367,7 +448,7 @@ def register(app):
         trig = ctx.triggered_id
         if not isinstance(trig, dict):
             return no_update, no_update
-        new_id = trig.get('index')
+        new_id = trig.get("index")
         if not new_id or new_id == current_id:
             return no_update, no_update
         set_demo_portfolio(new_id)
@@ -384,9 +465,9 @@ def register(app):
             return t === 'dark' ? '☀' : '🌙';
         }
         """,
-        Output('theme-toggle-btn', 'children'),
-        Input('app-root', 'id'),
-        State('theme-mode', 'data'),
+        Output("theme-toggle-btn", "children"),
+        Input("app-root", "id"),
+        State("theme-mode", "data"),
     )
 
     # Toggle on button click: flips the store value, updates data-theme, flips
@@ -400,9 +481,9 @@ def register(app):
             return [newTheme, newTheme === 'dark' ? '☀' : '🌙'];
         }
         """,
-        Output('theme-mode', 'data'),
-        Output('theme-toggle-btn', 'children', allow_duplicate=True),
-        Input('theme-toggle-btn', 'n_clicks'),
-        State('theme-mode', 'data'),
+        Output("theme-mode", "data"),
+        Output("theme-toggle-btn", "children", allow_duplicate=True),
+        Input("theme-toggle-btn", "n_clicks"),
+        State("theme-mode", "data"),
         prevent_initial_call=True,
     )

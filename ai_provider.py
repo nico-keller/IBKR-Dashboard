@@ -401,13 +401,13 @@ def ask(
 
     if not provider:
         raise ValueError(
-            (
+
                 "API key format not recognised. "
                 "Expected sk-ant-…, "
                 "xai-…, "
                 "AIza…, "
                 "or sk-… prefix."
-            )
+
         )
 
     history = history or []

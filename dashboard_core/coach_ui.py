@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from dash import ALL, Input, Output, State, ctx, dcc, html, no_update
@@ -43,23 +43,31 @@ log = logging.getLogger(__name__)
 
 def register(app):
     _COACH_BTN = {
-        'fontSize': '13px', 'color': COLOR_TEXT_MID, 'background': COLOR_SURFACE,
-        'border': '0.5px solid #ddd', 'borderRadius': '8px',
-        'padding': '6px 14px', 'cursor': 'pointer',
-        'transition': 'background 120ms ease, color 120ms ease',
+        "fontSize": "13px",
+        "color": COLOR_TEXT_MID,
+        "background": COLOR_SURFACE,
+        "border": "0.5px solid #ddd",
+        "borderRadius": "8px",
+        "padding": "6px 14px",
+        "cursor": "pointer",
+        "transition": "background 120ms ease, color 120ms ease",
     }
 
     _COACH_BTN_PRIMARY = {
         **_COACH_BTN,
-        'background': COLOR_TEXT_STRONG, 'color': COLOR_SURFACE_WHITE, 'border': '0.5px solid #111',
+        "background": COLOR_TEXT_STRONG,
+        "color": COLOR_SURFACE_WHITE,
+        "border": "0.5px solid #111",
     }
 
     _COACH_INPUT = {
-        'width': '100%', 'padding': '8px 10px', 'fontSize': '14px',
-        'border': '0.5px solid #ddd', 'borderRadius': '8px', 'marginBottom': '8px',
+        "width": "100%",
+        "padding": "8px 10px",
+        "fontSize": "14px",
+        "border": "0.5px solid #ddd",
+        "borderRadius": "8px",
+        "marginBottom": "8px",
     }
-
-
 
     # ── Thread helpers ────────────────────────────────────────────────────────────
     # A "thread" is one named conversation:
@@ -69,38 +77,33 @@ def register(app):
     def _new_thread(history: list | None = None) -> dict:
         h = list(history or [])
         return {
-            'id': uuid.uuid4().hex[:12],
-            'title': _thread_title(h),
-            'created': datetime.now(timezone.utc).isoformat(),
-            'history': h,
+            "id": uuid.uuid4().hex[:12],
+            "title": _thread_title(h),
+            "created": datetime.now(UTC).isoformat(),
+            "history": h,
         }
-
 
     def _thread_title(history: list) -> str:
         if not history:
-            return 'New chat'
-        first_q = (history[0].get('q') or '').strip().replace('\n', ' ')
+            return "New chat"
+        first_q = (history[0].get("q") or "").strip().replace("\n", " ")
         if not first_q:
-            return 'New chat'
-        return first_q[:40] + ('…' if len(first_q) > 40 else '')
-
+            return "New chat"
+        return first_q[:40] + ("…" if len(first_q) > 40 else "")
 
     def _find_thread(threads: list, thread_id: str | None) -> dict | None:
         if not thread_id:
             return None
         for t in threads or []:
-            if t.get('id') == thread_id:
+            if t.get("id") == thread_id:
                 return t
         return None
 
-
     def _active_history(threads: list, active_id: str | None) -> list:
         t = _find_thread(threads, active_id)
-        return list(t.get('history') or []) if t else []
+        return list(t.get("history") or []) if t else []
 
-
-    def _commit_history(threads: list, active_id: str | None,
-                        history: list) -> tuple[list, str]:
+    def _commit_history(threads: list, active_id: str | None, history: list) -> tuple[list, str]:
         """Write `history` into the active thread, creating one if needed.
         Returns (threads, active_id).  Auto-titles from the first user message."""
         threads = list(threads or [])
@@ -108,39 +111,64 @@ def register(app):
         if t is None:
             t = _new_thread(history)
             threads.insert(0, t)
-            active_id = t['id']
+            active_id = t["id"]
         else:
-            t['history'] = list(history)
+            t["history"] = list(history)
             # Only retitle if the title is still the default placeholder.
-            if t.get('title', 'New chat') in ('New chat', ''):
-                t['title'] = _thread_title(history)
+            if t.get("title", "New chat") in ("New chat", ""):
+                t["title"] = _thread_title(history)
         return threads, active_id
 
-
     _USER_BUBBLE = {
-        'maxWidth': '80%', 'padding': '10px 14px', 'borderRadius': '16px 16px 4px 16px',
-        'background': COLOR_TEXT_STRONG, 'color': COLOR_SURFACE_WHITE, 'fontSize': '14px', 'lineHeight': '1.5',
-        'whiteSpace': 'pre-wrap', 'wordBreak': 'break-word',
+        "maxWidth": "80%",
+        "padding": "10px 14px",
+        "borderRadius": "16px 16px 4px 16px",
+        "background": COLOR_TEXT_STRONG,
+        "color": COLOR_SURFACE_WHITE,
+        "fontSize": "14px",
+        "lineHeight": "1.5",
+        "whiteSpace": "pre-wrap",
+        "wordBreak": "break-word",
     }
     _ASSIST_BUBBLE = {
-        'maxWidth': '88%', 'padding': '12px 16px', 'borderRadius': '16px 16px 16px 4px',
-        'background': '#f4f4f5', 'color': COLOR_TEXT_STRONG, 'fontSize': '14px', 'lineHeight': '1.55',
-        'wordBreak': 'break-word',
+        "maxWidth": "88%",
+        "padding": "12px 16px",
+        "borderRadius": "16px 16px 16px 4px",
+        "background": "#f4f4f5",
+        "color": COLOR_TEXT_STRONG,
+        "fontSize": "14px",
+        "lineHeight": "1.55",
+        "wordBreak": "break-word",
     }
-    _ASSIST_ERR = {**_ASSIST_BUBBLE, 'background': COLOR_WARN_BG,
-                   'border': '0.5px solid #fde68a', 'color': COLOR_WARN}
+    _ASSIST_ERR = {
+        **_ASSIST_BUBBLE,
+        "background": COLOR_WARN_BG,
+        "border": "0.5px solid #fde68a",
+        "color": COLOR_WARN,
+    }
 
     _CHIP_STYLE = {
-        'fontSize': '12px', 'padding': '6px 12px', 'cursor': 'pointer',
-        'background': COLOR_SURFACE_WHITE, 'border': '0.5px solid #e5e7eb', 'borderRadius': '999px',
-        'color': COLOR_TEXT_SLATE, 'transition': 'all 120ms ease', 'textAlign': 'left',
-        'lineHeight': '1.3',
+        "fontSize": "12px",
+        "padding": "6px 12px",
+        "cursor": "pointer",
+        "background": COLOR_SURFACE_WHITE,
+        "border": "0.5px solid #e5e7eb",
+        "borderRadius": "999px",
+        "color": COLOR_TEXT_SLATE,
+        "transition": "all 120ms ease",
+        "textAlign": "left",
+        "lineHeight": "1.3",
     }
 
     _ICON_BTN = {
-        'background': 'transparent', 'border': 'none', 'cursor': 'pointer',
-        'color': COLOR_TEXT_MUTED, 'fontSize': '12px', 'padding': '2px 6px',
-        'borderRadius': '6px', 'marginLeft': '6px',
+        "background": "transparent",
+        "border": "none",
+        "cursor": "pointer",
+        "color": COLOR_TEXT_MUTED,
+        "fontSize": "12px",
+        "padding": "2px 6px",
+        "borderRadius": "6px",
+        "marginLeft": "6px",
     }
 
     _STARTER_PROMPTS = [
@@ -150,99 +178,177 @@ def register(app):
         "What would a fund manager cut from this portfolio first, and why?",
     ]
 
-
     def _user_row(text: str, is_last: bool = False):
         edit_btn = None
         if is_last:
             edit_btn = html.Button(
-                "✎ Edit", id='coach-edit-btn', n_clicks=0, title="Edit this question",
-                className='coach-icon-btn',
-                style={**_ICON_BTN, 'marginTop': '4px'})
-        return html.Div([
-            html.Div(text, style=_USER_BUBBLE),
-            edit_btn,
-        ], style={'display': 'flex', 'flexDirection': 'column',
-                  'alignItems': 'flex-end', 'marginBottom': '10px'})
+                "✎ Edit",
+                id="coach-edit-btn",
+                n_clicks=0,
+                title="Edit this question",
+                className="coach-icon-btn",
+                style={**_ICON_BTN, "marginTop": "4px"},
+            )
+        return html.Div(
+            [
+                html.Div(text, style=_USER_BUBBLE),
+                edit_btn,
+            ],
+            style={
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "flex-end",
+                "marginBottom": "10px",
+            },
+        )
 
-
-    def _assistant_row(text: str, idx: int, err: bool = False, is_last: bool = False,
-                       followups: list[str] | None = None):
+    def _assistant_row(
+        text: str, idx: int, err: bool = False, is_last: bool = False, followups: list[str] | None = None
+    ):
         body = (
-            html.Div(text, className='coach-error-bubble', style={**_ASSIST_ERR, 'whiteSpace': 'pre-wrap'})
-            if err else
-            html.Div(dcc.Markdown(text, style={'margin': '0'}), className='coach-assistant-bubble', style=_ASSIST_BUBBLE)
+            html.Div(text, className="coach-error-bubble", style={**_ASSIST_ERR, "whiteSpace": "pre-wrap"})
+            if err
+            else html.Div(
+                dcc.Markdown(text, style={"margin": "0"}),
+                className="coach-assistant-bubble",
+                style=_ASSIST_BUBBLE,
+            )
         )
         actions = None
         if not err:
             action_btns = [
-                html.Button("Copy", id={'type': 'coach-copy', 'index': idx},
-                            n_clicks=0, title="Copy answer",
-                            className='coach-icon-btn', style=_ICON_BTN),
+                html.Button(
+                    "Copy",
+                    id={"type": "coach-copy", "index": idx},
+                    n_clicks=0,
+                    title="Copy answer",
+                    className="coach-icon-btn",
+                    style=_ICON_BTN,
+                ),
             ]
             if is_last:
-                action_btns.append(html.Button(
-                    "↻ Regenerate", id='coach-regenerate-btn', n_clicks=0,
-                    title="Retry this question", className='coach-icon-btn',
-                    style=_ICON_BTN))
-            actions = html.Div(action_btns, style={
-                'display': 'flex', 'marginTop': '4px',
-                'marginLeft': '6px', 'opacity': '0.7'})
+                action_btns.append(
+                    html.Button(
+                        "↻ Regenerate",
+                        id="coach-regenerate-btn",
+                        n_clicks=0,
+                        title="Retry this question",
+                        className="coach-icon-btn",
+                        style=_ICON_BTN,
+                    )
+                )
+            actions = html.Div(
+                action_btns,
+                style={"display": "flex", "marginTop": "4px", "marginLeft": "6px", "opacity": "0.7"},
+            )
 
         chips = None
         if is_last and followups:
-            chips = html.Div([
-                html.Div([
-                    html.Button(f, id={'type': 'coach-followup', 'index': i},
-                                n_clicks=0, className='coach-chip', style=_CHIP_STYLE)
-                    for i, f in enumerate(followups)
-                ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '6px',
-                          'marginLeft': '2px', 'marginTop': '10px'}),
-            ])
+            chips = html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Button(
+                                f,
+                                id={"type": "coach-followup", "index": i},
+                                n_clicks=0,
+                                className="coach-chip",
+                                style=_CHIP_STYLE,
+                            )
+                            for i, f in enumerate(followups)
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexWrap": "wrap",
+                            "gap": "6px",
+                            "marginLeft": "2px",
+                            "marginTop": "10px",
+                        },
+                    ),
+                ]
+            )
 
-        return html.Div([
-            html.Div([body, actions] if actions else [body],
-                     style={'display': 'flex', 'flexDirection': 'column',
-                            'alignItems': 'flex-start'}),
-            chips,
-        ], style={'display': 'flex', 'flexDirection': 'column',
-                  'alignItems': 'flex-start', 'marginBottom': '14px'})
-
+        return html.Div(
+            [
+                html.Div(
+                    [body, actions] if actions else [body],
+                    style={"display": "flex", "flexDirection": "column", "alignItems": "flex-start"},
+                ),
+                chips,
+            ],
+            style={
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "flex-start",
+                "marginBottom": "14px",
+            },
+        )
 
     def _thinking_bubble():
         return html.Div(
-            html.Div([
-                html.Span(".", style={'animation': 'coachPulse 1.2s infinite', 'animationDelay': '0s'}),
-                html.Span(".", style={'animation': 'coachPulse 1.2s infinite', 'animationDelay': '0.2s', 'marginLeft': '2px'}),
-                html.Span(".", style={'animation': 'coachPulse 1.2s infinite', 'animationDelay': '0.4s', 'marginLeft': '2px'}),
-                html.Span("Thinking…", style={'marginLeft': '8px', 'color': COLOR_TEXT_MUTED,
-                                               'fontSize': '13px'}),
-            ], style={**_ASSIST_BUBBLE, 'display': 'flex', 'alignItems': 'center',
-                      'color': COLOR_TEXT_DIM}),
-            style={'display': 'flex', 'justifyContent': 'flex-start', 'marginBottom': '10px'},
+            html.Div(
+                [
+                    html.Span(".", style={"animation": "coachPulse 1.2s infinite", "animationDelay": "0s"}),
+                    html.Span(
+                        ".",
+                        style={
+                            "animation": "coachPulse 1.2s infinite",
+                            "animationDelay": "0.2s",
+                            "marginLeft": "2px",
+                        },
+                    ),
+                    html.Span(
+                        ".",
+                        style={
+                            "animation": "coachPulse 1.2s infinite",
+                            "animationDelay": "0.4s",
+                            "marginLeft": "2px",
+                        },
+                    ),
+                    html.Span(
+                        "Thinking…",
+                        style={"marginLeft": "8px", "color": COLOR_TEXT_MUTED, "fontSize": "13px"},
+                    ),
+                ],
+                style={**_ASSIST_BUBBLE, "display": "flex", "alignItems": "center", "color": COLOR_TEXT_DIM},
+            ),
+            style={"display": "flex", "justifyContent": "flex-start", "marginBottom": "10px"},
         )
-
 
     def _starter_panel():
         cards = [
             html.Button(
                 prompt,
-                id={'type': 'coach-starter', 'index': i}, n_clicks=0,
-                className='coach-starter-card',
+                id={"type": "coach-starter", "index": i},
+                n_clicks=0,
+                className="coach-starter-card",
                 style={
-                    'flex': '1', 'minWidth': '0', 'textAlign': 'left',
-                    'padding': '12px 14px', 'fontSize': '13px', 'color': COLOR_TEXT_STRONG,
-                    'lineHeight': '1.4', 'whiteSpace': 'normal',
-                    'background': COLOR_SURFACE_WHITE,
-                    'border': '0.5px solid #e5e7eb', 'borderRadius': '10px',
-                    'cursor': 'pointer', 'transition': 'all 140ms ease',
+                    "flex": "1",
+                    "minWidth": "0",
+                    "textAlign": "left",
+                    "padding": "12px 14px",
+                    "fontSize": "13px",
+                    "color": COLOR_TEXT_STRONG,
+                    "lineHeight": "1.4",
+                    "whiteSpace": "normal",
+                    "background": COLOR_SURFACE_WHITE,
+                    "border": "0.5px solid #e5e7eb",
+                    "borderRadius": "10px",
+                    "cursor": "pointer",
+                    "transition": "all 140ms ease",
                 },
             )
             for i, prompt in enumerate(_STARTER_PROMPTS)
         ]
-        return html.Div(cards, style={
-            'display': 'flex', 'flexWrap': 'nowrap', 'gap': '8px', 'padding': '8px 0 4px',
-        })
-
+        return html.Div(
+            cards,
+            style={
+                "display": "flex",
+                "flexWrap": "nowrap",
+                "gap": "8px",
+                "padding": "8px 0 4px",
+            },
+        )
 
     def _chat_bubbles(history: list[dict], pending: str | None = None):
         """Render the chat log — ChatGPT-style split bubbles."""
@@ -252,27 +358,26 @@ def register(app):
         rows: list = []
         last_idx = len(history) - 1
         for i, turn in enumerate(history):
-            q = turn.get('q', '')
-            a = turn.get('a', '')
-            err = bool(turn.get('error'))
-            fups = turn.get('followups') or []
+            q = turn.get("q", "")
+            a = turn.get("a", "")
+            err = bool(turn.get("error"))
+            fups = turn.get("followups") or []
             # "Edit" shows on the last user turn only when no request is in flight
             # and the last turn has a completed answer.
             rows.append(_user_row(q, is_last=(i == last_idx and not pending)))
-            rows.append(_assistant_row(a, idx=i, err=err,
-                                       is_last=(i == last_idx and not pending),
-                                       followups=fups))
+            rows.append(
+                _assistant_row(a, idx=i, err=err, is_last=(i == last_idx and not pending), followups=fups)
+            )
         if pending:
             rows.append(_user_row(pending))
             rows.append(_thinking_bubble())
 
         return html.Div(rows)
 
-
     @app.callback(
-        Output('coach-open', 'data'),
-        Input('coach-toggle-btn', 'n_clicks'),
-        State('coach-open', 'data'),
+        Output("coach-open", "data"),
+        Input("coach-toggle-btn", "n_clicks"),
+        State("coach-open", "data"),
         prevent_initial_call=True,
     )
     def toggle_coach(n, is_open):
@@ -280,10 +385,9 @@ def register(app):
             return no_update
         return not bool(is_open)
 
-
     @app.callback(
-        Output('coach-open', 'data', allow_duplicate=True),
-        Input('coach-close-btn', 'n_clicks'),
+        Output("coach-open", "data", allow_duplicate=True),
+        Input("coach-close-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def close_coach(n):
@@ -291,10 +395,9 @@ def register(app):
             return no_update
         return False
 
-
     @app.callback(
-        Output('coach-active-id', 'data'),
-        Input({'type': 'coach-preset-btn', 'index': ALL}, 'n_clicks'),
+        Output("coach-active-id", "data"),
+        Input({"type": "coach-preset-btn", "index": ALL}, "n_clicks"),
         prevent_initial_call=True,
     )
     def pick_scenario(clicks):
@@ -304,73 +407,71 @@ def register(app):
         # Guard against pattern-matching phantom triggers on mount.
         if not any(clicks or []):
             return no_update
-        return trig.get('index') or no_update
-
+        return trig.get("index") or no_update
 
     @app.callback(
-        Output('coach-mode', 'data'),
-        Input('coach-mode-preset-btn', 'n_clicks'),
-        Input('coach-mode-ai-btn', 'n_clicks'),
+        Output("coach-mode", "data"),
+        Input("coach-mode-preset-btn", "n_clicks"),
+        Input("coach-mode-ai-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def switch_mode(p, a):
         trig = ctx.triggered_id
-        if trig == 'coach-mode-ai-btn' and a:
-            return 'ai'
-        if trig == 'coach-mode-preset-btn' and p:
-            return 'preset'
+        if trig == "coach-mode-ai-btn" and a:
+            return "ai"
+        if trig == "coach-mode-preset-btn" and p:
+            return "preset"
         return no_update
 
-
     @app.callback(
-        Output('coach-clear-key-confirm', 'displayed'),
-        Input('coach-clear-key-btn', 'n_clicks'),
+        Output("coach-clear-key-confirm", "displayed"),
+        Input("coach-clear-key-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def show_clear_key_confirm(n):
         return bool(n)
 
     @app.callback(
-        Output('coach-api-key', 'data'),
-        Output('coach-key-status', 'data'),
-        Input('coach-save-key-btn', 'n_clicks'),
-        Input('coach-clear-key-confirm', 'submit_n_clicks'),
-        State('coach-key-input', 'value'),
+        Output("coach-api-key", "data"),
+        Output("coach-key-status", "data"),
+        Input("coach-save-key-btn", "n_clicks"),
+        Input("coach-clear-key-confirm", "submit_n_clicks"),
+        State("coach-key-input", "value"),
         prevent_initial_call=True,
     )
     def save_or_clear_key(save, clear_confirmed, value):
         trig = ctx.triggered_id
-        if trig == 'coach-clear-key-confirm' and clear_confirmed:
-            return '', None
-        if trig == 'coach-save-key-btn' and save:
-            key = (value or '').strip()
+        if trig == "coach-clear-key-confirm" and clear_confirmed:
+            return "", None
+        if trig == "coach-save-key-btn" and save:
+            key = (value or "").strip()
             ok, err = ai_provider.validate_key(key)
             if ok:
                 return key, None
-            return '', {'error': err}
+            return "", {"error": err}
         return no_update, no_update
-
 
     # ── Chat: submit → pending-q, then run_llm consumes pending-q ────────────────
 
     @app.callback(
-        Output('coach-pending-q', 'data'),
-        Output('coach-input', 'value'),
-        Output('coach-input', 'disabled'),
-        Output('coach-send-btn', 'disabled'),
-        Output('coach-send-btn', 'children'),
-        Input('coach-send-btn', 'n_clicks'),
-        Input('coach-input', 'n_submit'),
-        Input({'type': 'coach-starter',  'index': ALL}, 'n_clicks'),
-        Input({'type': 'coach-followup', 'index': ALL}, 'n_clicks'),
-        State('coach-input', 'value'),
-        State({'type': 'coach-starter',  'index': ALL}, 'children'),
-        State({'type': 'coach-followup', 'index': ALL}, 'children'),
-        State('coach-pending-q', 'data'),
+        Output("coach-pending-q", "data"),
+        Output("coach-input", "value"),
+        Output("coach-input", "disabled"),
+        Output("coach-send-btn", "disabled"),
+        Output("coach-send-btn", "children"),
+        Input("coach-send-btn", "n_clicks"),
+        Input("coach-input", "n_submit"),
+        Input({"type": "coach-starter", "index": ALL}, "n_clicks"),
+        Input({"type": "coach-followup", "index": ALL}, "n_clicks"),
+        State("coach-input", "value"),
+        State({"type": "coach-starter", "index": ALL}, "children"),
+        State({"type": "coach-followup", "index": ALL}, "children"),
+        State("coach-pending-q", "data"),
         prevent_initial_call=True,
     )
-    def submit_question(send_n, submit_n, starter_clicks, fup_clicks,
-                        text, starter_labels, fup_labels, pending):
+    def submit_question(
+        send_n, submit_n, starter_clicks, fup_clicks, text, starter_labels, fup_labels, pending
+    ):
         noop = (no_update,) * 5
 
         # If a request is already in flight, ignore new submissions.
@@ -379,18 +480,18 @@ def register(app):
 
         trig = ctx.triggered_id
         q = None
-        if trig == 'coach-send-btn' or trig == 'coach-input':
-            q = (text or '').strip()
+        if trig == "coach-send-btn" or trig == "coach-input":
+            q = (text or "").strip()
         elif isinstance(trig, dict):
-            t = trig.get('type')
-            i = trig.get('index')
+            t = trig.get("type")
+            i = trig.get("index")
             # Guard against the phantom trigger that pattern-matching Inputs
             # sometimes fire on mount (n_clicks is None/0 in that case).
-            clicks = starter_clicks if t == 'coach-starter' else fup_clicks
-            labels = starter_labels if t == 'coach-starter' else fup_labels
+            clicks = starter_clicks if t == "coach-starter" else fup_clicks
+            labels = starter_labels if t == "coach-starter" else fup_labels
             if i is None or i >= len(clicks) or not clicks[i]:
                 return noop
-            q = (labels[i] if i < len(labels) else '').strip()
+            q = (labels[i] if i < len(labels) else "").strip()
 
         if not q:
             return noop
@@ -398,56 +499,58 @@ def register(app):
         # Starter cards pre-fill the input so the user can review and hit Send.
         # Follow-up chips send immediately.
         if isinstance(trig, dict):
-            t = trig.get('type')
-            if t == 'coach-starter':
+            t = trig.get("type")
+            if t == "coach-starter":
                 return no_update, q, False, False, "Send ↑"
-            if t == 'coach-followup':
-                return q, '', True, True, "Sending…"
+            if t == "coach-followup":
+                return q, "", True, True, "Sending…"
 
         # Set pending-q → triggers run_llm via its Input. Disable input/button
         # while the request is in flight; run_llm re-enables them on completion.
-        return q, '', True, True, "Sending…"
-
+        return q, "", True, True, "Sending…"
 
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Output('coach-pending-q', 'data', allow_duplicate=True),
-        Output('coach-input', 'disabled', allow_duplicate=True),
-        Output('coach-send-btn', 'disabled', allow_duplicate=True),
-        Output('coach-send-btn', 'children', allow_duplicate=True),
-        Input('coach-pending-q', 'data'),
-        State('coach-api-key', 'data'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
-        State('portfolio-data', 'data'),
-        State('market-intel-data', 'data'),
-        State('valuation-data', 'data'),
-        State('uploaded-trades', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Output("coach-pending-q", "data", allow_duplicate=True),
+        Output("coach-input", "disabled", allow_duplicate=True),
+        Output("coach-send-btn", "disabled", allow_duplicate=True),
+        Output("coach-send-btn", "children", allow_duplicate=True),
+        Input("coach-pending-q", "data"),
+        State("coach-api-key", "data"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
+        State("portfolio-data", "data"),
+        State("market-intel-data", "data"),
+        State("valuation-data", "data"),
+        State("uploaded-trades", "data"),
         prevent_initial_call=True,
     )
     def run_llm(question, key, threads, active_id, port, intel, val, trades):
         # Triggered when submit_question writes a question into pending-q.
         # Also fires when we clear pending-q at the end — we bail on that.
-        log.info("coach.run_llm fired: question=%r key_present=%s",
-                 (question or '')[:60], bool(key))
+        log.info("coach.run_llm fired: question=%r key_present=%s", (question or "")[:60], bool(key))
         if not question:
             return no_update, no_update, no_update, no_update, no_update, no_update
 
         try:
             history = _active_history(threads, active_id)
             for turn in history:
-                turn.pop('followups', None)
+                turn.pop("followups", None)
 
             def _commit_and_return(h):
                 new_threads, new_active = _commit_history(threads, active_id, h)
                 return new_threads, new_active, None, False, False, "Send ↑"
 
             if not key:
-                history.append({'q': question,
-                                'a': "No API key saved. Switch to the AI tab and paste a key "
-                                     "(Anthropic / OpenAI / xAI) — it stays in your browser only.",
-                                'error': True})
+                history.append(
+                    {
+                        "q": question,
+                        "a": "No API key saved. Switch to the AI tab and paste a key "
+                        "(Anthropic / OpenAI / xAI) — it stays in your browser only.",
+                        "error": True,
+                    }
+                )
                 return _commit_and_return(history)
 
             try:
@@ -455,109 +558,132 @@ def register(app):
                 log.info("coach: calling provider=%s", provider)
                 context_json = ai_provider.build_portfolio_context(port, intel, val, trades)
                 t0 = time.time()
-                answer, followups = ai_provider.ask(key, context_json, question,
-                                                    history=history)
-                log.info("coach: provider reply in %.1fs, %d chars",
-                         time.time() - t0, len(answer or ''))
-                if not (answer or '').strip():
-                    history.append({'q': question,
-                                    'a': "The provider returned an empty response. "
-                                         "Try again or switch to a different model.",
-                                    'error': True})
+                answer, followups = ai_provider.ask(key, context_json, question, history=history)
+                log.info(
+                    "coach: provider reply in %.1fs, %d chars", time.time() - t0, len(answer or ""), answer
+                )
+                if not (answer or "").strip():
+                    history.append(
+                        {
+                            "q": question,
+                            "a": "The provider returned an empty response. "
+                            "Try again or switch to a different model.",
+                            "error": True,
+                        }
+                    )
                 else:
-                    history.append({'q': question, 'a': answer, 'followups': followups})
+                    history.append({"q": question, "a": answer, "followups": followups})
             except requests.HTTPError as e:
-                body = ''
+                body = ""
                 try:
                     body = e.response.text[:300]
                 except Exception:
                     pass
-                status = e.response.status_code if e.response else '?'
+                status = e.response.status_code if e.response else "?"
                 log.warning("coach: HTTPError %s: %s", status, body)
-                history.append({
-                    'q': question,
-                    'a': f"Provider returned an error ({status}). "
-                         f"Check that the key is valid and has credit.\n{body}",
-                    'error': True,
-                })
+                history.append(
+                    {
+                        "q": question,
+                        "a": f"Provider returned an error ({status}). "
+                        f"Check that the key is valid and has credit.\n{body}",
+                        "error": True,
+                    }
+                )
             except Exception as e:
                 log.exception("coach: provider call failed")
-                history.append({'q': question,
-                                'a': f"Couldn't reach the provider: {type(e).__name__}: {e}",
-                                'error': True})
+                history.append(
+                    {
+                        "q": question,
+                        "a": f"Couldn't reach the provider: {type(e).__name__}: {e}",
+                        "error": True,
+                    }
+                )
             return _commit_and_return(history)
         except Exception:
             log.exception("coach.run_llm crashed")
             # Return a safe state so the UI unsticks from "Thinking…"
             return no_update, no_update, None, False, False, "Send ↑"
 
-
     # ── Derived: chat-history = active thread's history ──────────────────────────
 
     @app.callback(
-        Output('coach-chat-history', 'data'),
-        Input('coach-threads', 'data'),
-        Input('coach-active-thread-id', 'data'),
+        Output("coach-chat-history", "data"),
+        Input("coach-threads", "data"),
+        Input("coach-active-thread-id", "data"),
     )
     def _derive_chat_history(threads, active_id):
         return _active_history(threads, active_id)
-
 
     # ── Render the thread-tabs row. Kept separate from render_coach so sending a
     #    message doesn't rebuild the whole panel.
 
     @app.callback(
-        Output('coach-tabs-row', 'children'),
-        Input('coach-threads', 'data'),
-        Input('coach-active-thread-id', 'data'),
+        Output("coach-tabs-row", "children"),
+        Input("coach-threads", "data"),
+        Input("coach-active-thread-id", "data"),
     )
     def render_thread_tabs(threads, active_thread_id):
         threads = threads or []
         tabs: list = []
         for t in threads:
-            is_active = (t.get('id') == active_thread_id)
-            tab_label = t.get('title') or 'New chat'
-            tabs.append(html.Div([
-                html.Button(
-                    tab_label,
-                    id={'type': 'coach-thread-tab', 'index': t['id']},
-                    n_clicks=0,
-                    title=tab_label,
-                    style={
-                        'background': COLOR_TEXT_STRONG if is_active else COLOR_SURFACE_WHITE,
-                        'color':      COLOR_SURFACE_WHITE if is_active else COLOR_TEXT_SLATE,
-                        'border':     '0.5px solid ' + (COLOR_TEXT_STRONG if is_active else COLOR_BORDER_MID),
-                        'borderRadius': '999px 0 0 999px',
-                        'padding': '4px 10px', 'fontSize': '12px',
-                        'cursor': 'pointer', 'maxWidth': '180px',
-                        'overflow': 'hidden', 'textOverflow': 'ellipsis',
-                        'whiteSpace': 'nowrap', 'fontWeight': '500',
-                    }),
-                html.Button(
-                    '×',
-                    id={'type': 'coach-thread-del', 'index': t['id']},
-                    n_clicks=0, title='Delete chat',
-                    style={
-                        'background': COLOR_TEXT_STRONG if is_active else COLOR_SURFACE_WHITE,
-                        'color':      COLOR_SURFACE_WHITE if is_active else '#9ca3af',
-                        'border':     '0.5px solid ' + (COLOR_TEXT_STRONG if is_active else COLOR_BORDER_MID),
-                        'borderLeft': 'none',
-                        'borderRadius': '0 999px 999px 0',
-                        'padding': '4px 8px', 'fontSize': '12px',
-                        'cursor': 'pointer', 'fontWeight': '600',
-                    }),
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '6px'}))
+            is_active = t.get("id") == active_thread_id
+            tab_label = t.get("title") or "New chat"
+            tabs.append(
+                html.Div(
+                    [
+                        html.Button(
+                            tab_label,
+                            id={"type": "coach-thread-tab", "index": t["id"]},
+                            n_clicks=0,
+                            title=tab_label,
+                            style={
+                                "background": COLOR_TEXT_STRONG if is_active else COLOR_SURFACE_WHITE,
+                                "color": COLOR_SURFACE_WHITE if is_active else COLOR_TEXT_SLATE,
+                                "border": "0.5px solid "
+                                + (COLOR_TEXT_STRONG if is_active else COLOR_BORDER_MID),
+                                "borderRadius": "999px 0 0 999px",
+                                "padding": "4px 10px",
+                                "fontSize": "12px",
+                                "cursor": "pointer",
+                                "maxWidth": "180px",
+                                "overflow": "hidden",
+                                "textOverflow": "ellipsis",
+                                "whiteSpace": "nowrap",
+                                "fontWeight": "500",
+                            },
+                        ),
+                        html.Button(
+                            "×",
+                            id={"type": "coach-thread-del", "index": t["id"]},
+                            n_clicks=0,
+                            title="Delete chat",
+                            style={
+                                "background": COLOR_TEXT_STRONG if is_active else COLOR_SURFACE_WHITE,
+                                "color": COLOR_SURFACE_WHITE if is_active else "#9ca3af",
+                                "border": "0.5px solid "
+                                + (COLOR_TEXT_STRONG if is_active else COLOR_BORDER_MID),
+                                "borderLeft": "none",
+                                "borderRadius": "0 999px 999px 0",
+                                "padding": "4px 8px",
+                                "fontSize": "12px",
+                                "cursor": "pointer",
+                                "fontWeight": "600",
+                            },
+                        ),
+                    ],
+                    style={"display": "flex", "alignItems": "center", "marginRight": "6px"},
+                )
+            )
         return tabs
-
 
     # ── Thread management: clear / new / switch / delete ─────────────────────────
 
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Input('coach-clear-chat-btn', 'n_clicks'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Input("coach-clear-chat-btn", "n_clicks"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
         prevent_initial_call=True,
     )
     def clear_chat(n, threads, active_id):
@@ -568,17 +694,16 @@ def register(app):
         t = _find_thread(threads, active_id)
         if t is None:
             return threads, active_id
-        t['history'] = []
-        t['title']   = 'New chat'
+        t["history"] = []
+        t["title"] = "New chat"
         return threads, active_id
 
-
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Input('coach-new-thread-btn', 'n_clicks'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Input("coach-new-thread-btn", "n_clicks"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
         prevent_initial_call=True,
     )
     def new_thread(n, threads, active_id):
@@ -587,19 +712,18 @@ def register(app):
         threads = list(threads or [])
         # If the active thread already has no messages, stay there — don't create a ghost.
         active = _find_thread(threads, active_id)
-        if active is not None and not (active.get('history') or []):
+        if active is not None and not (active.get("history") or []):
             return no_update, no_update
         # If the first thread is empty (and there's no active thread), reuse it.
-        if threads and not (threads[0].get('history') or []):
-            return threads, threads[0]['id']
+        if threads and not (threads[0].get("history") or []):
+            return threads, threads[0]["id"]
         t = _new_thread([])
         threads.insert(0, t)
-        return threads, t['id']
-
+        return threads, t["id"]
 
     @app.callback(
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Input({'type': 'coach-thread-tab', 'index': ALL}, 'n_clicks'),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Input({"type": "coach-thread-tab", "index": ALL}, "n_clicks"),
         prevent_initial_call=True,
     )
     def switch_thread(clicks):
@@ -608,41 +732,39 @@ def register(app):
             return no_update
         if not any(clicks or []):
             return no_update
-        return trig.get('index') or no_update
-
+        return trig.get("index") or no_update
 
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Input({'type': 'coach-thread-del', 'index': ALL}, 'n_clicks'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Input({"type": "coach-thread-del", "index": ALL}, "n_clicks"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
         prevent_initial_call=True,
     )
     def delete_thread(clicks, threads, active_id):
         trig = ctx.triggered_id
         if not isinstance(trig, dict) or not any(clicks or []):
             return no_update, no_update
-        tid = trig.get('index')
-        threads = [t for t in (threads or []) if t.get('id') != tid]
+        tid = trig.get("index")
+        threads = [t for t in (threads or []) if t.get("id") != tid]
         if active_id == tid:
-            active_id = threads[0]['id'] if threads else None
+            active_id = threads[0]["id"] if threads else None
         return threads, active_id
-
 
     # ── Regenerate last answer: pop last turn and resubmit its question ──────────
 
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Output('coach-pending-q', 'data', allow_duplicate=True),
-        Output('coach-input', 'disabled', allow_duplicate=True),
-        Output('coach-send-btn', 'disabled', allow_duplicate=True),
-        Output('coach-send-btn', 'children', allow_duplicate=True),
-        Input('coach-regenerate-btn', 'n_clicks'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
-        State('coach-pending-q', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Output("coach-pending-q", "data", allow_duplicate=True),
+        Output("coach-input", "disabled", allow_duplicate=True),
+        Output("coach-send-btn", "disabled", allow_duplicate=True),
+        Output("coach-send-btn", "children", allow_duplicate=True),
+        Input("coach-regenerate-btn", "n_clicks"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
+        State("coach-pending-q", "data"),
         prevent_initial_call=True,
     )
     def regenerate_last(n, threads, active_id, pending):
@@ -651,23 +773,22 @@ def register(app):
         history = _active_history(threads, active_id)
         if not history:
             return (no_update,) * 6
-        last_q = (history[-1].get('q') or '').strip()
+        last_q = (history[-1].get("q") or "").strip()
         if not last_q:
             return (no_update,) * 6
         history = history[:-1]
         new_threads, new_active = _commit_history(threads, active_id, history)
         return new_threads, new_active, last_q, True, True, "Sending…"
 
-
     # ── Edit last question: pop last turn and pre-fill the input ─────────────────
 
     @app.callback(
-        Output('coach-threads', 'data', allow_duplicate=True),
-        Output('coach-active-thread-id', 'data', allow_duplicate=True),
-        Output('coach-input', 'value', allow_duplicate=True),
-        Input('coach-edit-btn', 'n_clicks'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
+        Output("coach-threads", "data", allow_duplicate=True),
+        Output("coach-active-thread-id", "data", allow_duplicate=True),
+        Output("coach-input", "value", allow_duplicate=True),
+        Input("coach-edit-btn", "n_clicks"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
         prevent_initial_call=True,
     )
     def edit_last(n, threads, active_id):
@@ -676,22 +797,20 @@ def register(app):
         history = _active_history(threads, active_id)
         if not history:
             return no_update, no_update, no_update
-        last_q = (history[-1].get('q') or '')
+        last_q = history[-1].get("q") or ""
         history = history[:-1]
         new_threads, new_active = _commit_history(threads, active_id, history)
         return new_threads, new_active, last_q
 
-
     # ── Chat output: separate callback so typing/scrolling doesn't rebuild panel ─
 
     @app.callback(
-        Output('coach-chat-output', 'children'),
-        Input('coach-chat-history', 'data'),
-        Input('coach-pending-q', 'data'),
+        Output("coach-chat-output", "children"),
+        Input("coach-chat-history", "data"),
+        Input("coach-pending-q", "data"),
     )
     def render_chat(history, pending):
         return _chat_bubbles(history or [], pending)
-
 
     # ── Clientside: copy an answer to clipboard ─────────────────────────────────
 
@@ -720,12 +839,11 @@ def register(app):
             return (Date.now());
         }
         """,
-        Output('coach-copy-signal', 'data'),
-        Input({'type': 'coach-copy', 'index': ALL}, 'n_clicks'),
-        State('coach-chat-history', 'data'),
+        Output("coach-copy-signal", "data"),
+        Input({"type": "coach-copy", "index": ALL}, "n_clicks"),
+        State("coach-chat-history", "data"),
         prevent_initial_call=True,
     )
-
 
     # ── Clientside: auto-scroll the chat area to the bottom on new content ──────
 
@@ -739,11 +857,10 @@ def register(app):
             return Date.now();
         }
         """,
-        Output('coach-scroll-signal', 'data'),
-        Input('coach-chat-output', 'children'),
+        Output("coach-scroll-signal", "data"),
+        Input("coach-chat-output", "children"),
         prevent_initial_call=True,
     )
-
 
     # ── Clientside: smooth-scroll to a panel when it opens ──────────────────────
     # Target-Y math: let the BROWSER do it. We call scrollIntoView({block:'start'})
@@ -806,143 +923,185 @@ def register(app):
     # period changes, trade uploads, and 60-s data refreshes no longer yank
     # the page back down.  Guard on null so closing the panel is a no-op.
     app.clientside_callback(
-        _SMOOTH_SCROLL_JS_TMPL % {
-            'trigger':    'ticker',
-            'guard':      'if (!ticker) { return window.dash_clientside.no_update; }',
-            'element_id': 'position-detail',
-            'delay':      280,   # wait for slideInDown (250 ms) + a safety margin
+        _SMOOTH_SCROLL_JS_TMPL
+        % {
+            "trigger": "ticker",
+            "guard": "if (!ticker) { return window.dash_clientside.no_update; }",
+            "element_id": "position-detail",
+            "delay": 280,  # wait for slideInDown (250 ms) + a safety margin
         },
-        Output('position-detail-scroll-signal', 'data'),
-        Input('selected-ticker', 'data'),
+        Output("position-detail-scroll-signal", "data"),
+        Input("selected-ticker", "data"),
         prevent_initial_call=True,
     )
 
     # Coach panel: trigger on coach-open flipping to True. NOT on coach-panel.children
     # (that would yank the page up on every chat keystroke during a re-render).
     app.clientside_callback(
-        _SMOOTH_SCROLL_JS_TMPL % {
-            'trigger':    'isOpen',
-            'guard':      'if (!isOpen) { return window.dash_clientside.no_update; }',
-            'element_id': 'coach-panel',
-            'delay':      80,    # coach render is server-side only; no slide animation
+        _SMOOTH_SCROLL_JS_TMPL
+        % {
+            "trigger": "isOpen",
+            "guard": "if (!isOpen) { return window.dash_clientside.no_update; }",
+            "element_id": "coach-panel",
+            "delay": 80,  # coach render is server-side only; no slide animation
         },
-        Output('coach-panel-scroll-signal', 'data'),
-        Input('coach-open', 'data'),
+        Output("coach-panel-scroll-signal", "data"),
+        Input("coach-open", "data"),
         prevent_initial_call=True,
     )
-
 
     # ── Prefill: cleared on the next tick after it's consumed by render_coach ───
     # coach-input reads prefill as its initial value. We clear the store right
     # after so the next panel render doesn't re-insert the same text.
 
     @app.callback(
-        Output('coach-prefill', 'data', allow_duplicate=True),
-        Input('coach-panel', 'children'),
-        State('coach-prefill', 'data'),
+        Output("coach-prefill", "data", allow_duplicate=True),
+        Input("coach-panel", "children"),
+        State("coach-prefill", "data"),
         prevent_initial_call=True,
     )
     def clear_prefill_after_render(_children, prefill):
-        return '' if prefill else no_update
-
+        return "" if prefill else no_update
 
     # ── Ask coach about a specific ticker ────────────────────────────────────────
     # Button lives inside the position-detail panel. Clicking it opens the coach,
     # switches to AI mode, and pre-fills the input with a specific, actionable
     # question about the ticker so the user can send immediately or lightly edit.
 
-
-
     @app.callback(
-        Output('coach-open',    'data', allow_duplicate=True),
-        Output('coach-mode',    'data', allow_duplicate=True),
-        Output('coach-prefill', 'data', allow_duplicate=True),
-        Input({'type': 'position-ask-coach', 'index': ALL}, 'n_clicks'),
-        State('selected-ticker', 'data'),
+        Output("coach-open", "data", allow_duplicate=True),
+        Output("coach-mode", "data", allow_duplicate=True),
+        Output("coach-prefill", "data", allow_duplicate=True),
+        Input({"type": "position-ask-coach", "index": ALL}, "n_clicks"),
+        State("selected-ticker", "data"),
         prevent_initial_call=True,
     )
     def ask_coach_about_position(clicks, ticker):
         if not any(clicks or []) or not ticker:
             return no_update, no_update, no_update
-        return True, 'ai', ''
-
+        return True, "ai", ""
 
     def _mode_btn_style(active: bool) -> dict:
         # Constant fontWeight (600) across active/inactive prevents width jitter
         # between states. minWidth ensures "Preset" and "AI" occupy identical
         # space so the pill never reshuffles when the user toggles modes.
         base = {
-            'padding':        '6px 16px',
-            'fontSize':       '12px',
-            'fontWeight':     '600',
-            'minWidth':       '62px',
-            'textAlign':      'center',
-            'lineHeight':     '1.4',
-            'border':         'none',
-            'outline':        'none',
-            'borderRadius':   '5px',
-            'letterSpacing': '0.02em',
-            'fontFamily':     'inherit',
-            'cursor':         'pointer',
-            'boxSizing':      'border-box',
-            'transition':     'background 120ms ease, color 120ms ease',
+            "padding": "6px 16px",
+            "fontSize": "12px",
+            "fontWeight": "600",
+            "minWidth": "62px",
+            "textAlign": "center",
+            "lineHeight": "1.4",
+            "border": "none",
+            "outline": "none",
+            "borderRadius": "5px",
+            "letterSpacing": "0.02em",
+            "fontFamily": "inherit",
+            "cursor": "pointer",
+            "boxSizing": "border-box",
+            "transition": "background 120ms ease, color 120ms ease",
         }
         if active:
-            return {**base, 'color': COLOR_SURFACE_WHITE, 'background': COLOR_TEXT_STRONG}
-        return {**base, 'color': COLOR_TEXT_DIM, 'background': 'transparent'}
-
+            return {**base, "color": COLOR_SURFACE_WHITE, "background": COLOR_TEXT_STRONG}
+        return {**base, "color": COLOR_TEXT_DIM, "background": "transparent"}
 
     @app.callback(
-        Output('coach-panel', 'children'),
-        Input('coach-open', 'data'),
-        Input('coach-mode', 'data'),
-        Input('coach-active-id', 'data'),
-        Input('coach-api-key', 'data'),
-        Input('coach-key-status', 'data'),
-        State('coach-threads', 'data'),
-        State('coach-active-thread-id', 'data'),
-        State('coach-chat-history', 'data'),
-        State('coach-prefill', 'data'),
-        State('portfolio-data', 'data'),
-        State('market-intel-data', 'data'),
-        State('valuation-data', 'data'),
+        Output("coach-panel", "children"),
+        Input("coach-open", "data"),
+        Input("coach-mode", "data"),
+        Input("coach-active-id", "data"),
+        Input("coach-api-key", "data"),
+        Input("coach-key-status", "data"),
+        State("coach-threads", "data"),
+        State("coach-active-thread-id", "data"),
+        State("coach-chat-history", "data"),
+        State("coach-prefill", "data"),
+        State("portfolio-data", "data"),
+        State("market-intel-data", "data"),
+        State("valuation-data", "data"),
     )
-    def render_coach(is_open, mode, active_id, key, key_status, threads, active_thread_id,
-                     chat_history, prefill, port, intel, val):
+    def render_coach(
+        is_open,
+        mode,
+        active_id,
+        key,
+        key_status,
+        threads,
+        active_thread_id,
+        chat_history,
+        prefill,
+        port,
+        intel,
+        val,
+    ):
         if not is_open:
             return None
 
-        mode = mode or 'preset'
+        mode = mode or "preset"
 
         # ── Header: title left, mode toggle + close button right ──────────────────
-        toggle = html.Div([
-            html.Button("Preset", id='coach-mode-preset-btn',
-                        style=_mode_btn_style(mode == 'preset')),
-            html.Button("AI", id='coach-mode-ai-btn',
-                        style=_mode_btn_style(mode == 'ai')),
-        ], style={'display': 'flex', 'gap': '2px', 'padding': '3px',
-                  'background': COLOR_SURFACE, 'borderRadius': '7px'})
+        toggle = html.Div(
+            [
+                html.Button("Preset", id="coach-mode-preset-btn", style=_mode_btn_style(mode == "preset")),
+                html.Button("AI", id="coach-mode-ai-btn", style=_mode_btn_style(mode == "ai")),
+            ],
+            style={
+                "display": "flex",
+                "gap": "2px",
+                "padding": "3px",
+                "background": COLOR_SURFACE,
+                "borderRadius": "7px",
+            },
+        )
 
-        header = html.Div([
-            html.Div([
-                html.Span("✨", style={'fontSize': '18px', 'marginRight': '8px'}),
-                html.Span("Portfolio coach",
-                          style={'fontSize': '16px', 'fontWeight': '600', 'color': COLOR_TEXT_STRONG}),
-            ], style={'display': 'flex', 'alignItems': 'center'}),
-            html.Div([
-                toggle,
-                html.Button("✕", id='coach-close-btn', title="Close", style={
-                    'width': '32px', 'height': '28px', 'background': COLOR_SURFACE_WHITE,
-                    'border': '0.5px solid #ddd', 'borderRadius': '6px',
-                    'cursor': 'pointer', 'fontSize': '14px', 'color': COLOR_TEXT_DIM,
-                    'padding': '0', 'lineHeight': '1', 'marginLeft': '10px',
-                }),
-            ], style={'display': 'flex', 'alignItems': 'center'}),
-        ], style={'display': 'flex', 'justifyContent': 'space-between',
-                  'alignItems': 'center', 'marginBottom': '14px',
-                  'paddingBottom': '14px', 'borderBottom': '0.5px solid #ebebeb'})
+        header = html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span("✨", style={"fontSize": "18px", "marginRight": "8px"}),
+                        html.Span(
+                            "Portfolio coach",
+                            style={"fontSize": "16px", "fontWeight": "600", "color": COLOR_TEXT_STRONG},
+                        ),
+                    ],
+                    style={"display": "flex", "alignItems": "center"},
+                ),
+                html.Div(
+                    [
+                        toggle,
+                        html.Button(
+                            "✕",
+                            id="coach-close-btn",
+                            title="Close",
+                            style={
+                                "width": "32px",
+                                "height": "28px",
+                                "background": COLOR_SURFACE_WHITE,
+                                "border": "0.5px solid #ddd",
+                                "borderRadius": "6px",
+                                "cursor": "pointer",
+                                "fontSize": "14px",
+                                "color": COLOR_TEXT_DIM,
+                                "padding": "0",
+                                "lineHeight": "1",
+                                "marginLeft": "10px",
+                            },
+                        ),
+                    ],
+                    style={"display": "flex", "alignItems": "center"},
+                ),
+            ],
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "marginBottom": "14px",
+                "paddingBottom": "14px",
+                "borderBottom": "0.5px solid #ebebeb",
+            },
+        )
 
-        provider    = ai_provider.detect_provider(key or '')
+        provider = ai_provider.detect_provider(key or "")
         key_present = bool(provider)
 
         children: list = [header]
@@ -951,89 +1110,147 @@ def register(app):
         # edit, new-thread) always have a target even when the relevant widget
         # isn't visible. suppress_callback_exceptions lets Dash tolerate missing
         # ids, but pattern-matching callbacks are happier with them present.
-        _hidden_always = html.Div([
-            html.Button(id='coach-regenerate-btn', n_clicks=0, style={'display': 'none'}),
-            html.Button(id='coach-edit-btn',       n_clicks=0, style={'display': 'none'}),
-            html.Button(id='coach-new-thread-btn', n_clicks=0, style={'display': 'none'}),
-            html.Div(id='coach-tabs-row', style={'display': 'none'}),
-        ], style={'display': 'none'})
+        _hidden_always = html.Div(
+            [
+                html.Button(id="coach-regenerate-btn", n_clicks=0, style={"display": "none"}),
+                html.Button(id="coach-edit-btn", n_clicks=0, style={"display": "none"}),
+                html.Button(id="coach-new-thread-btn", n_clicks=0, style={"display": "none"}),
+                html.Div(id="coach-tabs-row", style={"display": "none"}),
+            ],
+            style={"display": "none"},
+        )
 
-        if mode == 'preset':
+        if mode == "preset":
             # ── Preset: grid of clickable question chips + answer box ─────────────
             def _preset_chip_style(selected: bool) -> dict:
                 base = {
-                    'padding': '10px 14px', 'fontSize': '13px', 'cursor': 'pointer',
-                    'borderRadius': '10px', 'textAlign': 'left', 'lineHeight': '1.35',
-                    'transition': 'all 120ms ease', 'fontWeight': '500',
+                    "padding": "10px 14px",
+                    "fontSize": "13px",
+                    "cursor": "pointer",
+                    "borderRadius": "10px",
+                    "textAlign": "left",
+                    "lineHeight": "1.35",
+                    "transition": "all 120ms ease",
+                    "fontWeight": "500",
                 }
                 if selected:
-                    return {**base, 'background': COLOR_TEXT_STRONG, 'color': COLOR_SURFACE_WHITE,
-                            'border': '0.5px solid #111'}
-                return {**base, 'background': COLOR_SURFACE_WHITE, 'color': COLOR_TEXT_SLATE,
-                        'border': '0.5px solid #e5e7eb'}
+                    return {
+                        **base,
+                        "background": COLOR_TEXT_STRONG,
+                        "color": COLOR_SURFACE_WHITE,
+                        "border": "0.5px solid #111",
+                    }
+                return {
+                    **base,
+                    "background": COLOR_SURFACE_WHITE,
+                    "color": COLOR_TEXT_SLATE,
+                    "border": "0.5px solid #e5e7eb",
+                }
 
-            children.append(html.Div([
-                html.Button(
-                    s['label'],
-                    id={'type': 'coach-preset-btn', 'index': s['id']},
-                    n_clicks=0,
-                    className='coach-chip',
-                    style=_preset_chip_style(s['id'] == active_id),
+            children.append(
+                html.Div(
+                    [
+                        html.Button(
+                            s["label"],
+                            id={"type": "coach-preset-btn", "index": s["id"]},
+                            n_clicks=0,
+                            className="coach-chip",
+                            style=_preset_chip_style(s["id"] == active_id),
+                        )
+                        for s in SCENARIOS
+                    ],
+                    style={
+                        "display": "grid",
+                        "gridTemplateColumns": "repeat(auto-fill, minmax(220px, 1fr))",
+                        "gap": "8px",
+                    },
                 )
-                for s in SCENARIOS
-            ], style={'display': 'grid',
-                      'gridTemplateColumns': 'repeat(auto-fill, minmax(220px, 1fr))',
-                      'gap': '8px'}))
+            )
 
             if active_id:
-                children.append(html.Div(
-                    render_scenario(active_id, port, intel, val),
-                    style={'marginTop': '14px'},
-                ))
+                children.append(
+                    html.Div(
+                        render_scenario(active_id, port, intel, val),
+                        style={"marginTop": "14px"},
+                    )
+                )
             # Hidden AI-only ids (keep registered for callbacks)
-            children.append(html.Div([
-                dcc.Input(id='coach-key-input', type='password', style={'display': 'none'}),
-                html.Button(id='coach-save-key-btn',  style={'display': 'none'}),
-                html.Button(id='coach-clear-key-btn', style={'display': 'none'}),
-                dcc.ConfirmDialog(id='coach-clear-key-confirm', message=''),
-                dcc.Input(id='coach-input', type='text', style={'display': 'none'}),
-                html.Button(id='coach-send-btn',        style={'display': 'none'}),
-                html.Button(id='coach-clear-chat-btn',  style={'display': 'none'}),
-                html.Div(id='coach-chat-output', style={'display': 'none'}),
-            ], style={'display': 'none'}))
+            children.append(
+                html.Div(
+                    [
+                        dcc.Input(id="coach-key-input", type="password", style={"display": "none"}),
+                        html.Button(id="coach-save-key-btn", style={"display": "none"}),
+                        html.Button(id="coach-clear-key-btn", style={"display": "none"}),
+                        dcc.ConfirmDialog(id="coach-clear-key-confirm", message=""),
+                        dcc.Input(id="coach-input", type="text", style={"display": "none"}),
+                        html.Button(id="coach-send-btn", style={"display": "none"}),
+                        html.Button(id="coach-clear-chat-btn", style={"display": "none"}),
+                        html.Div(id="coach-chat-output", style={"display": "none"}),
+                    ],
+                    style={"display": "none"},
+                )
+            )
             children.append(_hidden_always)
 
         elif not key_present:
             # ── AI mode without key: key-entry form ───────────────────────────────
-            key_err = (key_status or {}).get('error')
-            children.append(html.Div([
-                html.Div([
-                    dcc.Input(
-                        id='coach-key-input', type='password', value='',
-                        placeholder='Paste API key: sk-ant-… / xai-… / sk-…',
-                        n_submit=0,
-                        style={**_COACH_INPUT, 'marginBottom': '0', 'flex': '1',
-                               'borderColor': '#ef4444' if key_err else None},
-                    ),
-                    html.Button("Save", id='coach-save-key-btn',
-                                style={**_COACH_BTN_PRIMARY, 'marginLeft': '8px'}),
-                ], style={'display': 'flex', 'alignItems': 'stretch'}),
-                html.Div(key_err, style={
-                    'fontSize': '12px', 'color': '#ef4444',
-                    'margin': '6px 0 0', 'lineHeight': '1.5',
-                }) if key_err else html.Div(
-                    "Stored in your browser only — never uploaded.",
-                    style={'color': COLOR_TEXT_FAINT, 'fontSize': '12px', 'margin': '6px 0 0'},
-                ),
-            ]))
-            children.append(html.Div([
-                html.Button(id='coach-clear-key-btn',   style={'display': 'none'}),
-                dcc.ConfirmDialog(id='coach-clear-key-confirm', message=''),
-                dcc.Input(id='coach-input', type='text', style={'display': 'none'}),
-                html.Button(id='coach-send-btn',        style={'display': 'none'}),
-                html.Button(id='coach-clear-chat-btn',  style={'display': 'none'}),
-                html.Div(id='coach-chat-output',        style={'display': 'none'}),
-            ], style={'display': 'none'}))
+            key_err = (key_status or {}).get("error")
+            children.append(
+                html.Div(
+                    [
+                        html.Div(
+                            [
+                                dcc.Input(
+                                    id="coach-key-input",
+                                    type="password",
+                                    value="",
+                                    placeholder="Paste API key: sk-ant-… / xai-… / sk-…",
+                                    n_submit=0,
+                                    style={
+                                        **_COACH_INPUT,
+                                        "marginBottom": "0",
+                                        "flex": "1",
+                                        "borderColor": "#ef4444" if key_err else None,
+                                    },
+                                ),
+                                html.Button(
+                                    "Save",
+                                    id="coach-save-key-btn",
+                                    style={**_COACH_BTN_PRIMARY, "marginLeft": "8px"},
+                                ),
+                            ],
+                            style={"display": "flex", "alignItems": "stretch"},
+                        ),
+                        html.Div(
+                            key_err,
+                            style={
+                                "fontSize": "12px",
+                                "color": "#ef4444",
+                                "margin": "6px 0 0",
+                                "lineHeight": "1.5",
+                            },
+                        )
+                        if key_err
+                        else html.Div(
+                            "Stored in your browser only — never uploaded.",
+                            style={"color": COLOR_TEXT_FAINT, "fontSize": "12px", "margin": "6px 0 0"},
+                        ),
+                    ]
+                )
+            )
+            children.append(
+                html.Div(
+                    [
+                        html.Button(id="coach-clear-key-btn", style={"display": "none"}),
+                        dcc.ConfirmDialog(id="coach-clear-key-confirm", message=""),
+                        dcc.Input(id="coach-input", type="text", style={"display": "none"}),
+                        html.Button(id="coach-send-btn", style={"display": "none"}),
+                        html.Button(id="coach-clear-chat-btn", style={"display": "none"}),
+                        html.Div(id="coach-chat-output", style={"display": "none"}),
+                    ],
+                    style={"display": "none"},
+                )
+            )
             children.append(_hidden_always)
 
         else:
@@ -1044,79 +1261,166 @@ def register(app):
             # When there are no threads yet, collapse the whole row (including its
             # border) so the panel doesn't show an empty gap above the status bar.
             has_threads = bool(threads)
-            tabs_row = html.Div([
-                html.Div(id='coach-tabs-row', style={
-                    'display': 'flex', 'overflowX': 'auto', 'flex': '1',
-                    'alignItems': 'center', 'gap': '0',
-                    'scrollbarWidth': 'thin',
-                }),
-                html.Button("＋ New", id='coach-new-thread-btn', n_clicks=0, style={
-                    'background': COLOR_SURFACE_WHITE, 'color': COLOR_TEXT_STRONG,
-                    'border': '0.5px solid #e5e7eb', 'borderRadius': '999px',
-                    'padding': '4px 12px', 'fontSize': '12px',
-                    'cursor': 'pointer', 'marginLeft': '8px', 'fontWeight': '500',
-                    'whiteSpace': 'nowrap',
-                }),
-            ], style={
-                'display': 'flex' if has_threads else 'none',
-                'alignItems': 'center',
-                'marginBottom': '10px', 'paddingBottom': '10px',
-                'borderBottom': '0.5px solid #f0f0f0',
-            })
+            tabs_row = html.Div(
+                [
+                    html.Div(
+                        id="coach-tabs-row",
+                        style={
+                            "display": "flex",
+                            "overflowX": "auto",
+                            "flex": "1",
+                            "alignItems": "center",
+                            "gap": "0",
+                            "scrollbarWidth": "thin",
+                        },
+                    ),
+                    html.Button(
+                        "＋ New",
+                        id="coach-new-thread-btn",
+                        n_clicks=0,
+                        style={
+                            "background": COLOR_SURFACE_WHITE,
+                            "color": COLOR_TEXT_STRONG,
+                            "border": "0.5px solid #e5e7eb",
+                            "borderRadius": "999px",
+                            "padding": "4px 12px",
+                            "fontSize": "12px",
+                            "cursor": "pointer",
+                            "marginLeft": "8px",
+                            "fontWeight": "500",
+                            "whiteSpace": "nowrap",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex" if has_threads else "none",
+                    "alignItems": "center",
+                    "marginBottom": "10px",
+                    "paddingBottom": "10px",
+                    "borderBottom": "0.5px solid #f0f0f0",
+                },
+            )
 
             # Chat scroll area
             chat_area = html.Div(
                 _chat_bubbles(chat_history or [], None),
-                id='coach-chat-output',
-                className='coach-chat-output',
-                style={'maxHeight': '420px', 'overflowY': 'auto',
-                       'padding': '4px 0 12px', 'marginBottom': '4px'},
+                id="coach-chat-output",
+                className="coach-chat-output",
+                style={
+                    "maxHeight": "420px",
+                    "overflowY": "auto",
+                    "padding": "4px 0 12px",
+                    "marginBottom": "4px",
+                },
             )
 
             _CLEAR_BTN = {
-                'background': 'none', 'border': 'none', 'padding': '0',
-                'fontSize': '13px', 'color': COLOR_TEXT_MID,
-                'cursor': 'pointer', 'transition': 'color 120ms ease', 'fontWeight': '500',
+                "background": "none",
+                "border": "none",
+                "padding": "0",
+                "fontSize": "13px",
+                "color": COLOR_TEXT_MID,
+                "cursor": "pointer",
+                "transition": "color 120ms ease",
+                "fontWeight": "500",
             }
-            input_row = html.Div([
-                dcc.Input(
-                    id='coach-input', type='text', value=prefill or '', n_submit=0,
-                    placeholder='Message your coach…',
-                    autoComplete='off', debounce=False,
-                    style={'flex': '1', 'padding': '5px 10px', 'fontSize': '14px',
-                           'lineHeight': '1.5', 'boxSizing': 'border-box',
-                           'border': '1px solid #e2e8f0', 'borderRadius': '10px',
-                           'background': COLOR_SURFACE_WHITE, 'color': COLOR_TEXT_STRONG,
-                           'transition': 'border-color 120ms ease'},
-                ),
-                html.Button("Send ↑", id='coach-send-btn', n_clicks=0,
-                            className='coach-send-btn',
-                            style={**_COACH_BTN_PRIMARY,
-                                   'marginLeft': '8px', 'padding': '5px 18px',
-                                   'fontSize': '13px', 'fontWeight': '600',
-                                   'borderRadius': '10px', 'alignSelf': 'stretch'}),
-            ], className='coach-input-row',
-               style={'display': 'flex', 'alignItems': 'stretch'})
+            input_row = html.Div(
+                [
+                    dcc.Input(
+                        id="coach-input",
+                        type="text",
+                        value=prefill or "",
+                        n_submit=0,
+                        placeholder="Message your coach…",
+                        autoComplete="off",
+                        debounce=False,
+                        style={
+                            "flex": "1",
+                            "padding": "5px 10px",
+                            "fontSize": "14px",
+                            "lineHeight": "1.5",
+                            "boxSizing": "border-box",
+                            "border": "1px solid #e2e8f0",
+                            "borderRadius": "10px",
+                            "background": COLOR_SURFACE_WHITE,
+                            "color": COLOR_TEXT_STRONG,
+                            "transition": "border-color 120ms ease",
+                        },
+                    ),
+                    html.Button(
+                        "Send ↑",
+                        id="coach-send-btn",
+                        n_clicks=0,
+                        className="coach-send-btn",
+                        style={
+                            **_COACH_BTN_PRIMARY,
+                            "marginLeft": "8px",
+                            "padding": "5px 18px",
+                            "fontSize": "13px",
+                            "fontWeight": "600",
+                            "borderRadius": "10px",
+                            "alignSelf": "stretch",
+                        },
+                    ),
+                ],
+                className="coach-input-row",
+                style={"display": "flex", "alignItems": "stretch"},
+            )
 
             # Footer: connected status + clear actions
-            footer = html.Div([
-                html.Span([
-                    html.Span("●", style={'fontSize': '9px', 'marginRight': '5px',
-                                         'color': '#22c55e', 'lineHeight': '1'}),
-                    html.Span(f"{ai_provider.provider_label(provider)} connected",
-                              style={'color': COLOR_TEXT_MUTED}),
-                ], style={'display': 'inline-flex', 'alignItems': 'center'}),
-                html.Div([
-                    html.Button("Clear chat", id='coach-clear-chat-btn', n_clicks=0,
-                                className='coach-clear-link', style=_CLEAR_BTN),
-                    html.Span("·", style={'color': COLOR_TEXT_FAINT, 'margin': '0 7px'}),
-                    html.Button("Clear key", id='coach-clear-key-btn', n_clicks=0,
-                                className='coach-clear-link', style=_CLEAR_BTN),
-                    dcc.ConfirmDialog(id='coach-clear-key-confirm',
-                                      message='Are you sure you want to clear the API key?'),
-                ], style={'display': 'flex', 'alignItems': 'center'}),
-            ], style={'display': 'flex', 'justifyContent': 'space-between',
-                      'alignItems': 'center', 'marginBottom': '12px', 'fontSize': '13px'})
+            footer = html.Div(
+                [
+                    html.Span(
+                        [
+                            html.Span(
+                                "●",
+                                style={
+                                    "fontSize": "9px",
+                                    "marginRight": "5px",
+                                    "color": "#22c55e",
+                                    "lineHeight": "1",
+                                },
+                            ),
+                            html.Span(
+                                f"{ai_provider.provider_label(provider)} connected",
+                                style={"color": COLOR_TEXT_MUTED},
+                            ),
+                        ],
+                        style={"display": "inline-flex", "alignItems": "center"},
+                    ),
+                    html.Div(
+                        [
+                            html.Button(
+                                "Clear chat",
+                                id="coach-clear-chat-btn",
+                                n_clicks=0,
+                                className="coach-clear-link",
+                                style=_CLEAR_BTN,
+                            ),
+                            html.Span("·", style={"color": COLOR_TEXT_FAINT, "margin": "0 7px"}),
+                            html.Button(
+                                "Clear key",
+                                id="coach-clear-key-btn",
+                                n_clicks=0,
+                                className="coach-clear-link",
+                                style=_CLEAR_BTN,
+                            ),
+                            dcc.ConfirmDialog(
+                                id="coach-clear-key-confirm",
+                                message="Are you sure you want to clear the API key?",
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "12px",
+                    "fontSize": "13px",
+                },
+            )
 
             children.append(tabs_row)
             children.append(footer)
@@ -1124,16 +1428,21 @@ def register(app):
             children.append(input_row)
 
             # Hidden key-input ids (keep registered)
-            children.append(html.Div([
-                dcc.Input(id='coach-key-input', type='password',
-                          value=key or '', style={'display': 'none'}),
-                html.Button(id='coach-save-key-btn', style={'display': 'none'}),
-            ], style={'display': 'none'}))
+            children.append(
+                html.Div(
+                    [
+                        dcc.Input(
+                            id="coach-key-input", type="password", value=key or "", style={"display": "none"}
+                        ),
+                        html.Button(id="coach-save-key-btn", style={"display": "none"}),
+                    ],
+                    style={"display": "none"},
+                )
+            )
 
         return html.Div(
             children,
-            id='coach-panel-card',
-            className='coach-panel-card',
-            style={**CARD, 'marginTop': '14px'},
+            id="coach-panel-card",
+            className="coach-panel-card",
+            style={**CARD, "marginTop": "14px"},
         )
-

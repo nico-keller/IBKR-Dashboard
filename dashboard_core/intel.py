@@ -51,7 +51,6 @@ log = logging.getLogger(__name__)
 _last_intel_tickers: tuple | None = None
 
 
-
 def register(app):
     # ── Toast notifications ───────────────────────────────────────────────────
     # One callback covers all toast triggers.  Using a single Output avoids the
@@ -61,17 +60,17 @@ def register(app):
     # so React unmounts and remounts it — which restarts the CSS animation
     # even when the message text is identical to the previous one.
     @app.callback(
-        Output('toast', 'children'),
-        Input('portfolio-data', 'data'),
-        Input('export-pdf-btn', 'n_clicks'),
+        Output("toast", "children"),
+        Input("portfolio-data", "data"),
+        Input("export-pdf-btn", "n_clicks"),
         prevent_initial_call=True,
     )
     def update_toast(*_):
         triggered = ctx.triggered_id
-        ts = datetime.now().strftime('%H:%M:%S')
+        ts = datetime.now().strftime("%H:%M:%S")
         messages = {
-            'portfolio-data': f"Portfolio refreshed · {ts}",
-            'export-pdf-btn': f"PDF downloaded · {ts}",
+            "portfolio-data": f"Portfolio refreshed · {ts}",
+            "export-pdf-btn": f"PDF downloaded · {ts}",
         }
         msg = messages.get(triggered)
         if not msg:
@@ -79,14 +78,17 @@ def register(app):
         return html.Div(
             msg,
             key=str(time.time()),
-            className='toast-msg',
+            className="toast-msg",
             style={
-                'background': COLOR_TEXT_STRONG, 'color': COLOR_SURFACE_WHITE,
-                'padding': '10px 18px', 'borderRadius': '12px',
-                'fontSize': '15px', 'fontWeight': '500',
-                'letterSpacing': '0.01em',
-                'boxShadow': '0 4px 20px rgba(0,0,0,0.18)',
-                'whiteSpace': 'nowrap',
+                "background": COLOR_TEXT_STRONG,
+                "color": COLOR_SURFACE_WHITE,
+                "padding": "10px 18px",
+                "borderRadius": "12px",
+                "fontSize": "15px",
+                "fontWeight": "500",
+                "letterSpacing": "0.01em",
+                "boxShadow": "0 4px 20px rgba(0,0,0,0.18)",
+                "whiteSpace": "nowrap",
             },
         )
 
@@ -95,29 +97,31 @@ def register(app):
     # parallel (sector/geo + earnings concurrently) so cold-start latency is
     # bounded by the slower of the two rather than their sum.
     @app.callback(
-        Output('market-intel-data', 'data'),
-        Input('portfolio-data', 'data'),
+        Output("market-intel-data", "data"),
+        Input("portfolio-data", "data"),
     )
     def populate_market_intel(data):
         global _last_intel_tickers
-        if not data or 'positions' not in data:
+        if not data or "positions" not in data:
             _last_intel_tickers = None
             return None
 
-        tickers    = [p['ticker'] for p in data['positions']]
+        tickers = [p["ticker"] for p in data["positions"]]
         ticker_key = tuple(sorted(tickers))
 
         if ticker_key == _last_intel_tickers:
             return no_update
 
-        parallel = run_parallel({
-            'sector_geo': lambda: get_sector_geo(tickers),
-            'earnings':   lambda: get_earnings_data(tickers),
-        })
+        parallel = run_parallel(
+            {
+                "sector_geo": lambda: get_sector_geo(tickers),
+                "earnings": lambda: get_earnings_data(tickers),
+            }
+        )
         result = {
-            'tickers':    tickers,
-            'sector_geo': parallel.get('sector_geo') or {},
-            'earnings':   parallel.get('earnings')   or {},
+            "tickers": tickers,
+            "sector_geo": parallel.get("sector_geo") or {},
+            "earnings": parallel.get("earnings") or {},
         }
 
         _last_intel_tickers = ticker_key
@@ -125,60 +129,60 @@ def register(app):
 
     # ── 1. Sector & Geography ────────────────────────────────────────────────
     @app.callback(
-        Output('sector-geo-section', 'children'),
-        Input('market-intel-data', 'data'),
-        Input('connection-status', 'data'),
-        State('portfolio-data', 'data'),
+        Output("sector-geo-section", "children"),
+        Input("market-intel-data", "data"),
+        Input("connection-status", "data"),
+        State("portfolio-data", "data"),
     )
-    @safe_render('Sector & Geography')
+    @safe_render("Sector & Geography")
     def render_sector_geo(intel, status, port_data):
         return _render_sector_geo_inner(intel, port_data, status)
 
     # ── 3. Earnings calendar ─────────────────────────────────────────────────
     @app.callback(
-        Output('earnings-section', 'children'),
-        Input('market-intel-data', 'data'),
-        Input('connection-status', 'data'),
-        State('portfolio-data', 'data'),
+        Output("earnings-section", "children"),
+        Input("market-intel-data", "data"),
+        Input("connection-status", "data"),
+        State("portfolio-data", "data"),
     )
-    @safe_render('Earnings')
+    @safe_render("Earnings")
     def render_earnings(intel, status, port_data):
         return _render_earnings_inner(intel, port_data, status)
 
 
-def _render_sector_geo_inner(intel, port_data, status=''):
+def _render_sector_geo_inner(intel, port_data, status=""):
     if not intel:
-        base = (status or '').split(':')[0]
-        if base in ('disconnected', 'no_positions'):
+        base = (status or "").split(":")[0]
+        if base in ("disconnected", "no_positions"):
             return []
-        raise NotReadyError('Loading sector & geography data…')
-    if not port_data or 'positions' not in port_data:
+        raise NotReadyError("Loading sector & geography data…")
+    if not port_data or "positions" not in port_data:
         return None
 
-    sg = intel.get('sector_geo', {})
-    positions = port_data['positions']
+    sg = intel.get("sector_geo", {})
+    positions = port_data["positions"]
 
-    sector_val:     dict = {}
-    country_val:    dict = {}
+    sector_val: dict = {}
+    country_val: dict = {}
     sector_tickers: dict = {}
 
     for p in positions:
-        sym  = p['ticker']
-        val  = p['market_value']
+        sym = p["ticker"]
+        val = p["market_value"]
         info = sg.get(sym, {})
-        cty  = info.get('country', 'Unknown')
+        cty = info.get("country", "Unknown")
         country_val[cty] = country_val.get(cty, 0) + val
 
-        weights = info.get('sector_weights') or {}
-        if info.get('is_etf') and weights:
+        weights = info.get("sector_weights") or {}
+        if info.get("is_etf") and weights:
             wsum = sum(weights.values()) or 1.0
             for sec, w in weights.items():
                 share = val * (w / wsum)
                 sector_val[sec] = sector_val.get(sec, 0) + share
                 sector_tickers.setdefault(sec, []).append(sym)
         else:
-            sec = info.get('sector', 'Unknown')
-            sector_val[sec]  = sector_val.get(sec, 0) + val
+            sec = info.get("sector", "Unknown")
+            sector_val[sec] = sector_val.get(sec, 0) + val
             sector_tickers.setdefault(sec, []).append(sym)
 
     # De-duplicate ticker lists
@@ -198,46 +202,69 @@ def _render_sector_geo_inner(intel, port_data, status=''):
     sec_labels = [s[0] for s in sec_full_sorted]
     sec_values = [s[1] for s in sec_full_sorted]
 
-    colors = [COLOR_BRAND, COLOR_WARN_SOFT, '#a855f7', COLOR_GOOD_SOFT,
-              COLOR_WARN_YELLOW, '#ec4899', '#14b8a6', '#6366f1',
-              '#84cc16', '#ef4444', '#06b6d4']
+    colors = [
+        COLOR_BRAND,
+        COLOR_WARN_SOFT,
+        "#a855f7",
+        COLOR_GOOD_SOFT,
+        COLOR_WARN_YELLOW,
+        "#ec4899",
+        "#14b8a6",
+        "#6366f1",
+        "#84cc16",
+        "#ef4444",
+        "#06b6d4",
+    ]
     sec_colors = [colors[i % len(colors)] for i in range(len(sec_labels))]
     color_by_sec = dict(zip(sec_labels, sec_colors, strict=True))
 
-    acct          = port_data.get('account') or {}
-    rate          = acct.get('eurusd_rate') or EURUSD_FALLBACK
-    base_ccy      = acct.get('base_currency', 'EUR')
-    sym           = ccy_symbol(base_ccy)
-    total_val_raw = (port_data.get('summary') or {}).get('total_value') or total
-    total_base    = to_base(total_val_raw, rate, base_ccy)
+    acct = port_data.get("account") or {}
+    rate = acct.get("eurusd_rate") or EURUSD_FALLBACK
+    base_ccy = acct.get("base_currency", "EUR")
+    sym = ccy_symbol(base_ccy)
+    total_val_raw = (port_data.get("summary") or {}).get("total_value") or total
+    total_base = to_base(total_val_raw, rate, base_ccy)
     if total_base >= 1_000_000:
-        center_val = f"{sym}{total_base/1_000_000:.2f}M"
+        center_val = f"{sym}{total_base / 1_000_000:.2f}M"
     elif total_base >= 1_000:
-        center_val = f"{sym}{total_base/1_000:.1f}K"
+        center_val = f"{sym}{total_base / 1_000:.1f}K"
     else:
         center_val = f"{sym}{total_base:,.0f}"
 
     sec_values_base = [to_base(v, rate, base_ccy) for v in sec_values]
-    donut = go.Figure(go.Pie(
-        labels=sec_labels, values=sec_values, hole=0.62,
-        textposition='none', sort=False,
-        marker=dict(colors=sec_colors),
-        customdata=sec_values_base,
-        hovertemplate=f'<b>%{{label}}</b><br>%{{percent:.1%}}  ·  {sym}%{{customdata:,.0f}}<extra></extra>',
-    ))
+    donut = go.Figure(
+        go.Pie(
+            labels=sec_labels,
+            values=sec_values,
+            hole=0.62,
+            textposition="none",
+            sort=False,
+            marker=dict(colors=sec_colors),
+            customdata=sec_values_base,
+            hovertemplate=f"<b>%{{label}}</b><br>%{{percent:.1%}}  ·  {sym}%{{customdata:,.0f}}<extra></extra>",
+        )
+    )
     donut.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
         showlegend=False,
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         height=200,
-        annotations=[dict(
-            text=(f"<span style='font-size:18px;"
-                  f"color:var(--clr-text-strong);font-weight:600'>"
-                  f"{center_val}</span><br>"
-                  f"<span style='font-size:11px;color:var(--clr-text-muted);"
-                  f"letter-spacing:0.05em;text-transform:uppercase'>Portfolio</span>"),
-            x=0.5, y=0.5, showarrow=False, align='center',
-        )],
+        annotations=[
+            dict(
+                text=(
+                    f"<span style='font-size:18px;"
+                    f"color:var(--clr-text-strong);font-weight:600'>"
+                    f"{center_val}</span><br>"
+                    f"<span style='font-size:11px;color:var(--clr-text-muted);"
+                    f"letter-spacing:0.05em;text-transform:uppercase'>Portfolio</span>"
+                ),
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                align="center",
+            )
+        ],
     )
 
     # ── Country chart ────────────────────────────────────────────────────────
@@ -245,28 +272,44 @@ def _render_sector_geo_inner(intel, port_data, status=''):
     cty_labels = [c[0] for c in cty_sorted]
     cty_values = [c[1] / total * 100 for c in cty_sorted]
 
-    country_colors = [COLOR_BRAND, COLOR_GOOD_SOFT, COLOR_WARN_SOFT, '#a855f7',
-                      COLOR_WARN_YELLOW, '#ec4899', '#14b8a6', '#6366f1']
+    country_colors = [
+        COLOR_BRAND,
+        COLOR_GOOD_SOFT,
+        COLOR_WARN_SOFT,
+        "#a855f7",
+        COLOR_WARN_YELLOW,
+        "#ec4899",
+        "#14b8a6",
+        "#6366f1",
+    ]
 
-    center_text = (f"{cty_values[0]:.0f}%<br>"
-                   f"<span style='font-size:11px;color:#888'>{cty_labels[0]}</span>"
-                   if len(cty_labels) == 1 else '')
-    bar = go.Figure(go.Pie(
-        labels=cty_labels, values=cty_values, hole=0.62,
-        textposition='none',
-        marker=dict(colors=country_colors[:len(cty_labels)]),
-        hovertemplate='<b>%{label}</b><br>%{percent:.1%}<extra></extra>',
-    ))
+    center_text = (
+        f"{cty_values[0]:.0f}%<br><span style='font-size:11px;color:#888'>{cty_labels[0]}</span>"
+        if len(cty_labels) == 1
+        else ""
+    )
+    bar = go.Figure(
+        go.Pie(
+            labels=cty_labels,
+            values=cty_values,
+            hole=0.62,
+            textposition="none",
+            marker=dict(colors=country_colors[: len(cty_labels)]),
+            hovertemplate="<b>%{label}</b><br>%{percent:.1%}<extra></extra>",
+        )
+    )
     bar.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
         showlegend=(len(cty_labels) > 1),
-        legend=dict(orientation='h', yanchor='bottom', y=-0.15,
-                    xanchor='center', x=0.5, font=dict(size=11)),
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=11)),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         height=200,
-        annotations=[dict(text=center_text, x=0.5, y=0.5,
-                          font=dict(size=20, color=COLOR_TEXT),
-                          showarrow=False)] if center_text else [],
+        annotations=[
+            dict(text=center_text, x=0.5, y=0.5, font=dict(size=20, color=COLOR_TEXT), showarrow=False)
+        ]
+        if center_text
+        else [],
     )
 
     # ── Sector breakdown legend table ────────────────────────────────────────
@@ -280,152 +323,207 @@ def _render_sector_geo_inner(intel, port_data, status=''):
             other_val += val
             other_names.append(sec)
     if other_val / total * 100 >= 1.0:
-        other_tickers = sorted({
-            t for s in other_names for t in sector_tickers.get(s, [])
-        })
-        sector_tickers['Other'] = other_tickers
-        legend_sectors.append(('Other', other_val, '#b8b8b8'))
+        other_tickers = sorted({t for s in other_names for t in sector_tickers.get(s, [])})
+        sector_tickers["Other"] = other_tickers
+        legend_sectors.append(("Other", other_val, "#b8b8b8"))
 
     legend_rows = []
     for sec, val, dot_color in legend_sectors:
         pct = val / total * 100
-        tickers_str = ', '.join(sorted(sector_tickers.get(sec, [])))
-        legend_rows.append(html.Tr([
-            html.Td(html.Div(style={
-                'width': '8px', 'height': '8px', 'borderRadius': '50%',
-                'background': dot_color, 'display': 'inline-block',
-            }), style={'padding': '6px 8px 6px 0', 'width': '17px'}),
-            html.Td(sec, style={'padding': '6px 12px 6px 0',
-                                'fontSize': '15px', 'fontWeight': '500'}),
-            html.Td(f'{pct:.1f}%', style={'padding': '6px 12px', 'textAlign': 'right',
-                                           'fontSize': '15px', 'color': COLOR_TEXT_MID}),
-            html.Td(tickers_str, style={'padding': '6px 0', 'fontSize': '14px',
-                                         'color': COLOR_TEXT_MUTED}),
-        ], style={'borderTop': f'0.5px solid {COLOR_BORDER_LIGHT}'}))
+        tickers_str = ", ".join(sorted(sector_tickers.get(sec, [])))
+        legend_rows.append(
+            html.Tr(
+                [
+                    html.Td(
+                        html.Div(
+                            style={
+                                "width": "8px",
+                                "height": "8px",
+                                "borderRadius": "50%",
+                                "background": dot_color,
+                                "display": "inline-block",
+                            }
+                        ),
+                        style={"padding": "6px 8px 6px 0", "width": "17px"},
+                    ),
+                    html.Td(
+                        sec, style={"padding": "6px 12px 6px 0", "fontSize": "15px", "fontWeight": "500"}
+                    ),
+                    html.Td(
+                        f"{pct:.1f}%",
+                        style={
+                            "padding": "6px 12px",
+                            "textAlign": "right",
+                            "fontSize": "15px",
+                            "color": COLOR_TEXT_MID,
+                        },
+                    ),
+                    html.Td(
+                        tickers_str, style={"padding": "6px 0", "fontSize": "14px", "color": COLOR_TEXT_MUTED}
+                    ),
+                ],
+                style={"borderTop": f"0.5px solid {COLOR_BORDER_LIGHT}"},
+            )
+        )
 
     sector_legend = html.Table(
         [html.Tbody(legend_rows)],
-        style={'borderCollapse': 'collapse', 'marginTop': '17px', 'width': '100%'},
+        style={"borderCollapse": "collapse", "marginTop": "17px", "width": "100%"},
     )
 
     _label_style = {
-        'fontSize': '14px', 'color': COLOR_TEXT_MID,
-        'textTransform': 'uppercase', 'letterSpacing': '0.05em',
-        'fontWeight': '600', 'margin': '0 0 8px',
-        'textAlign': 'center',
+        "fontSize": "14px",
+        "color": COLOR_TEXT_MID,
+        "textTransform": "uppercase",
+        "letterSpacing": "0.05em",
+        "fontWeight": "600",
+        "margin": "0 0 8px",
+        "textAlign": "center",
     }
 
-    return html.Div([
-        section_label("Sector & Geography Exposure"),
+    return html.Div(
+        [
+            section_label("Sector & Geography Exposure"),
+            # ── Two equal chart columns ───────────────────────────────────────────
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.P("Sector", style=_label_style),
+                            dcc.Graph(figure=donut, config={"displayModeBar": False}),
+                        ],
+                        style={"flex": "1", "minWidth": "240px"},
+                    ),
+                    html.Div(
+                        [
+                            html.P("Geography", style=_label_style),
+                            dcc.Graph(figure=bar, config={"displayModeBar": False}),
+                        ],
+                        style={"flex": "1", "minWidth": "240px"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "gap": "24px",
+                    "flexWrap": "wrap",
+                    "alignItems": "flex-start",
+                    "marginBottom": "8px",
+                },
+            ),
+            # ── Full-width breakdown table ────────────────────────────────────────
+            sector_legend,
+        ],
+        style=CARD,
+    )
 
-        # ── Two equal chart columns ───────────────────────────────────────────
-        html.Div([
-            html.Div([
-                html.P("Sector", style=_label_style),
-                dcc.Graph(figure=donut, config={'displayModeBar': False}),
-            ], style={'flex': '1', 'minWidth': '240px'}),
 
-            html.Div([
-                html.P("Geography", style=_label_style),
-                dcc.Graph(figure=bar, config={'displayModeBar': False}),
-            ], style={'flex': '1', 'minWidth': '240px'}),
-        ], style={'display': 'flex', 'gap': '24px', 'flexWrap': 'wrap',
-                  'alignItems': 'flex-start', 'marginBottom': '8px'}),
-
-        # ── Full-width breakdown table ────────────────────────────────────────
-        sector_legend,
-
-    ], style=CARD)
-
-
-def _render_earnings_inner(intel, port_data, status=''):
+def _render_earnings_inner(intel, port_data, status=""):
     if not intel:
-        base = (status or '').split(':')[0]
-        if base in ('disconnected', 'no_positions'):
+        base = (status or "").split(":")[0]
+        if base in ("disconnected", "no_positions"):
             return []
-        raise NotReadyError('Loading earnings data…')
+        raise NotReadyError("Loading earnings data…")
 
-    earnings = intel.get('earnings', {})
-    positions = (port_data or {}).get('positions', [])
-    alloc_map = {p['ticker']: p['allocation_pct'] for p in positions}
+    earnings = intel.get("earnings", {})
+    positions = (port_data or {}).get("positions", [])
+    alloc_map = {p["ticker"]: p["allocation_pct"] for p in positions}
 
     today = date.today()
 
     rows_data = []
     for sym, e in earnings.items():
-        if not e.get('next_date'):
+        if not e.get("next_date"):
             continue
         try:
-            earn_date = date.fromisoformat(e['next_date'])
+            earn_date = date.fromisoformat(e["next_date"])
         except Exception:
             continue
         days = (earn_date - today).days
-        rows_data.append({
-            'ticker':    sym,
-            'next_date': e['next_date'],
-            'days':      days,
-            'avg_move':  e.get('avg_1d_move'),
-            'moves':     e.get('last_1d_moves', []),
-            'weight':    alloc_map.get(sym, 0),
-        })
+        rows_data.append(
+            {
+                "ticker": sym,
+                "next_date": e["next_date"],
+                "days": days,
+                "avg_move": e.get("avg_1d_move"),
+                "moves": e.get("last_1d_moves", []),
+                "weight": alloc_map.get(sym, 0),
+            }
+        )
 
     if not rows_data:
         return html.Div(
-            html.P("No upcoming earnings dates found — holdings may be ETFs or "
-                   "data is unavailable.",
-                   style={'fontSize': '15px', 'color': COLOR_TEXT_GHOST,
-                          'textAlign': 'center', 'padding': '24px 0'}),
-            style=CARD)
+            html.P(
+                "No upcoming earnings dates found — holdings may be ETFs or data is unavailable.",
+                style={
+                    "fontSize": "15px",
+                    "color": COLOR_TEXT_GHOST,
+                    "textAlign": "center",
+                    "padding": "24px 0",
+                },
+            ),
+            style=CARD,
+        )
 
-    rows_data.sort(key=lambda x: x['days'])
+    rows_data.sort(key=lambda x: x["days"])
 
-    td_l = lambda v, **kw: html.Td(v, style={'padding': '10px 12px',
-                                               'textAlign': 'left', **kw})
-    td_r = lambda v, **kw: html.Td(v, style={'padding': '10px 12px',
-                                               'textAlign': 'center', **kw})
+    td_l = lambda v, **kw: html.Td(v, style={"padding": "10px 12px", "textAlign": "left", **kw})
+    td_r = lambda v, **kw: html.Td(v, style={"padding": "10px 12px", "textAlign": "center", **kw})
 
     table_rows = []
     for r in rows_data:
-        days      = r['days']
-        imminent  = days <= 14
-        soon      = days <= 30
+        days = r["days"]
+        imminent = days <= 14
+        soon = days <= 30
 
         if days < 0:
-            days_str  = f"{abs(days)}d ago"
+            days_str = f"{abs(days)}d ago"
             days_color = COLOR_TEXT_GHOST
         elif days == 0:
-            days_str  = 'Today'
+            days_str = "Today"
             days_color = COLOR_BAD
         else:
-            days_str  = f'in {days}d'
+            days_str = f"in {days}d"
             days_color = COLOR_BAD if imminent else (COLOR_WARN if soon else COLOR_TEXT_MUTED)
 
-        weight_str  = f"{r['weight']:.1f}%"
-        row_class   = 'earnings-row-imminent' if imminent else ''
+        weight_str = f"{r['weight']:.1f}%"
+        row_class = "earnings-row-imminent" if imminent else ""
 
-        table_rows.append(html.Tr([
-            td_l(html.Span(r['ticker'], style={'fontWeight': '600'})),
-            td_r(r['next_date'], color=COLOR_TEXT_MID),
-            td_r(days_str,       color=days_color,
-                 fontWeight='600' if imminent else '400'),
-            td_r(weight_str,     color=COLOR_TEXT_MID),
-        ], className=row_class,
-           style={'borderTop': f'0.5px solid {COLOR_BORDER_LIGHT}'}))
+        table_rows.append(
+            html.Tr(
+                [
+                    td_l(html.Span(r["ticker"], style={"fontWeight": "600"})),
+                    td_r(r["next_date"], color=COLOR_TEXT_MID),
+                    td_r(days_str, color=days_color, fontWeight="600" if imminent else "400"),
+                    td_r(weight_str, color=COLOR_TEXT_MID),
+                ],
+                className=row_class,
+                style={"borderTop": f"0.5px solid {COLOR_BORDER_LIGHT}"},
+            )
+        )
 
-    cols = ['Ticker', 'Earnings Date', 'When', 'Weight']
-    header = html.Tr([
-        html.Th(c, style={**TABLE_HEADER_CELL,
-                          'textAlign': 'left' if i == 0 else 'center',
-                          'width': '25%',
-                          })
-        for i, c in enumerate(cols)
-    ])
+    cols = ["Ticker", "Earnings Date", "When", "Weight"]
+    header = html.Tr(
+        [
+            html.Th(
+                c,
+                style={
+                    **TABLE_HEADER_CELL,
+                    "textAlign": "left" if i == 0 else "center",
+                    "width": "25%",
+                },
+            )
+            for i, c in enumerate(cols)
+        ]
+    )
     table = html.Table(
         [html.Thead(header), html.Tbody(table_rows)],
-        style={**TABLE_WRAPPER, 'tableLayout': 'fixed'},
+        style={**TABLE_WRAPPER, "tableLayout": "fixed"},
     )
 
-    return html.Div([
-        section_label("Earnings Calendar"),
-        table,
-    ], style=CARD)
+    return html.Div(
+        [
+            section_label("Earnings Calendar"),
+            table,
+        ],
+        style=CARD,
+    )
