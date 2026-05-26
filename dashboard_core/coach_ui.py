@@ -174,7 +174,7 @@ def register(app):
     _STARTER_PROMPTS = [
         "Portfolio health check — strengths, risks, and one thing to fix.",
         "Am I over-concentrated? Where is my real exposure?",
-        "Where would you put €500 more given what I already hold?",
+        "Where would you put CHF 500 more given what I already hold?",
         "What would a fund manager cut from this portfolio first, and why?",
     ]
 

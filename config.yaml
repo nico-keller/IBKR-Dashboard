@@ -11,4 +11,4 @@ dashboard:
   refresh_interval_seconds: 60
 
 display:
-  eurusd_fallback: 1.08
+  usdchf_fallback: 0.92

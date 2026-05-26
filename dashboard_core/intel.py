@@ -21,7 +21,7 @@ from datetime import date, datetime
 import plotly.graph_objects as go
 from dash import Input, Output, State, ctx, dcc, html, no_update
 
-from dashboard_core.helpers import EURUSD_FALLBACK, ccy_symbol, section_label, to_base
+from dashboard_core.helpers import USDCHF_FALLBACK, ccy_symbol, section_label, to_base
 from decorators import NotReadyError, safe_render
 from market_intel import get_earnings_data, get_sector_geo
 from net_util import run_parallel
@@ -219,8 +219,8 @@ def _render_sector_geo_inner(intel, port_data, status=""):
     color_by_sec = dict(zip(sec_labels, sec_colors, strict=True))
 
     acct = port_data.get("account") or {}
-    rate = acct.get("eurusd_rate") or EURUSD_FALLBACK
-    base_ccy = acct.get("base_currency", "EUR")
+    rate = acct.get("usdchf_rate") or USDCHF_FALLBACK
+    base_ccy = acct.get("base_currency", "CHF")
     sym = ccy_symbol(base_ccy)
     total_val_raw = (port_data.get("summary") or {}).get("total_value") or total
     total_base = to_base(total_val_raw, rate, base_ccy)

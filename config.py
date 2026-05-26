@@ -18,29 +18,29 @@ import yaml
 
 # Allow config.yaml to live elsewhere (useful for Docker volume mounts).
 _CONFIG_PATH = os.environ.get(
-    'CONFIG_PATH',
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml'),
+    "CONFIG_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"),
 )
 
 _DEFAULTS: dict = {
-    'ibkr': {
-        'host':                   '127.0.0.1',
-        'port':                   4002,
-        'client_id':              1,
-        'readonly':               True,
-        'reconnect_delay_seconds': 5,   # base delay; actual delay is exponential
-        'heartbeat_interval':     30,   # seconds between liveness checks
+    "ibkr": {
+        "host": "127.0.0.1",
+        "port": 4002,
+        "client_id": 1,
+        "readonly": True,
+        "reconnect_delay_seconds": 5,  # base delay; actual delay is exponential
+        "heartbeat_interval": 30,  # seconds between liveness checks
     },
-    'dashboard': {
-        'host':                     '127.0.0.1',
-        'port':                     8050,
-        'refresh_interval_seconds': 60,
+    "dashboard": {
+        "host": "127.0.0.1",
+        "port": 8050,
+        "refresh_interval_seconds": 60,
     },
-    'display': {
-        'eurusd_fallback': 1.08,
+    "display": {
+        "usdchf_fallback": 0.92,
     },
-    'app': {
-        'demo_mode': False,
+    "app": {
+        "demo_mode": False,
     },
 }
 
@@ -60,32 +60,32 @@ def _apply_env_overrides(cfg: dict) -> dict:
     env = os.environ.get
 
     # IBKR connection
-    if env('IBKR_HOST'):
-        cfg['ibkr']['host'] = env('IBKR_HOST')
-    if env('IBKR_PORT'):
-        cfg['ibkr']['port'] = int(env('IBKR_PORT'))
-    if env('IBKR_CLIENT_ID'):
-        cfg['ibkr']['client_id'] = int(env('IBKR_CLIENT_ID'))
-    if env('IBKR_READONLY'):
-        cfg['ibkr']['readonly'] = env('IBKR_READONLY', '').lower() not in ('false', '0', 'no')
-    if env('IBKR_RECONNECT_DELAY'):
-        cfg['ibkr']['reconnect_delay_seconds'] = int(env('IBKR_RECONNECT_DELAY'))
+    if env("IBKR_HOST"):
+        cfg["ibkr"]["host"] = env("IBKR_HOST")
+    if env("IBKR_PORT"):
+        cfg["ibkr"]["port"] = int(env("IBKR_PORT"))
+    if env("IBKR_CLIENT_ID"):
+        cfg["ibkr"]["client_id"] = int(env("IBKR_CLIENT_ID"))
+    if env("IBKR_READONLY"):
+        cfg["ibkr"]["readonly"] = env("IBKR_READONLY", "").lower() not in ("false", "0", "no")
+    if env("IBKR_RECONNECT_DELAY"):
+        cfg["ibkr"]["reconnect_delay_seconds"] = int(env("IBKR_RECONNECT_DELAY"))
 
     # Dashboard server
-    if env('DASH_HOST'):
-        cfg['dashboard']['host'] = env('DASH_HOST')
-    if env('DASH_PORT'):
-        cfg['dashboard']['port'] = int(env('DASH_PORT'))
-    if env('REFRESH_INTERVAL'):
-        cfg['dashboard']['refresh_interval_seconds'] = int(env('REFRESH_INTERVAL'))
+    if env("DASH_HOST"):
+        cfg["dashboard"]["host"] = env("DASH_HOST")
+    if env("DASH_PORT"):
+        cfg["dashboard"]["port"] = int(env("DASH_PORT"))
+    if env("REFRESH_INTERVAL"):
+        cfg["dashboard"]["refresh_interval_seconds"] = int(env("REFRESH_INTERVAL"))
 
     # Display
-    if env('EURUSD_FALLBACK'):
-        cfg['display']['eurusd_fallback'] = float(env('EURUSD_FALLBACK'))
+    if env("USDCHF_FALLBACK"):
+        cfg["display"]["usdchf_fallback"] = float(env("USDCHF_FALLBACK"))
 
     # App-wide
-    if env('DEMO_MODE'):
-        cfg['app']['demo_mode'] = env('DEMO_MODE', '').lower() in ('1', 'true', 'yes', 'on')
+    if env("DEMO_MODE"):
+        cfg["app"]["demo_mode"] = env("DEMO_MODE", "").lower() in ("1", "true", "yes", "on")
 
     return cfg
 

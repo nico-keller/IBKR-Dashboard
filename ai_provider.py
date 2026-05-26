@@ -28,7 +28,7 @@ SYSTEM_PROMPT = (
     "You are a friendly coach for a first-time investor. "
     "Write plain English. If you use any jargon (P/E, CAPE, beta, yield, hedge, "
     "drawdown, allocation), define it in one short sentence the first time it "
-    "appears. Keep answers under 250 words unless the user explicitly asks for "
+    "appears. Keep answers under 350 words unless the user explicitly asks for "
     "a long answer. Base every claim on the portfolio data the user provides — "
     "never invent positions, prices, or numbers. If something isn't in the data, "
     "say you don't know rather than guess.\n\n"
@@ -40,10 +40,7 @@ SYSTEM_PROMPT = (
     "Do not write anything after that line."
 )
 
-_FOLLOWUPS_RE = re.compile(
-    r'\n?\s*FOLLOWUPS:\s*(\[[^\n]*\])\s*$',
-    re.MULTILINE
-)
+_FOLLOWUPS_RE = re.compile(r"\n?\s*FOLLOWUPS:\s*(\[[^\n]*\])\s*$", re.MULTILINE)
 
 
 def _strip_followups(text: str) -> tuple[str, list[str]]:
@@ -62,19 +59,16 @@ def _strip_followups(text: str) -> tuple[str, list[str]]:
         if not isinstance(fups, list):
             fups = []
 
-        fups = [
-            str(f).strip()
-            for f in fups
-            if str(f).strip()
-        ][:3]
+        fups = [str(f).strip() for f in fups if str(f).strip()][:3]
 
     except Exception:
         fups = []
 
-    return text[:m.start()].rstrip(), fups
+    return text[: m.start()].rstrip(), fups
 
 
 # ── Provider detection ────────────────────────────────────────────────────────
+
 
 def detect_provider(api_key: str) -> str | None:
     if not api_key:
@@ -161,12 +155,9 @@ def validate_key(api_key: str) -> tuple[bool, str]:
         headers = {}
 
     else:
-        headers = {
-            "Authorization": f"Bearer {api_key}"
-        }
+        headers = {"Authorization": f"Bearer {api_key}"}
 
     try:
-
         if provider == "google":
             r = requests.get(
                 url,
@@ -187,40 +178,25 @@ def validate_key(api_key: str) -> tuple[bool, str]:
         if r.status_code == 401:
             return (
                 False,
-                (
-                    "Key rejected by provider. "
-                    "Check for typos or expiration."
-                ),
+                ("Key rejected by provider. Check for typos or expiration."),
             )
 
         if r.status_code == 403:
             return (
                 False,
-                (
-                    "Access denied (403). "
-                    "Key may lack permissions."
-                ),
+                ("Access denied (403). Key may lack permissions."),
             )
 
-        return (
-            False,
-            f"Provider returned HTTP {r.status_code}"
-        )
+        return (False, f"Provider returned HTTP {r.status_code}")
 
     except requests.Timeout:
         return (
             False,
-            (
-                "Validation timed out. "
-                "Check connection and retry."
-            ),
+            ("Validation timed out. Check connection and retry."),
         )
 
     except Exception as e:
-        return (
-            False,
-            f"Could not reach provider: {e}"
-        )
+        return (False, f"Could not reach provider: {e}")
 
 
 # ── Per-provider call ─────────────────────────────────────────────────────────
@@ -261,11 +237,7 @@ def _ask_openai_compatible(
 
     r.raise_for_status()
 
-    return (
-        r.json()["choices"][0]
-        ["message"]["content"]
-        .strip()
-    )
+    return r.json()["choices"][0]["message"]["content"].strip()
 
 
 def _ask_anthropic(
@@ -294,11 +266,7 @@ def _ask_anthropic(
 
     body = r.json()
 
-    parts = [
-        b.get("text", "")
-        for b in body.get("content", [])
-        if b.get("type") == "text"
-    ]
+    parts = [b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"]
 
     return "\n".join(parts).strip()
 
@@ -312,7 +280,6 @@ def _ask_google(
     contents = []
 
     for m in messages:
-
         role = "user"
 
         if m["role"] == "assistant":
@@ -321,30 +288,15 @@ def _ask_google(
         contents.append(
             {
                 "role": role,
-                "parts": [
-                    {
-                        "text": m["content"]
-                    }
-                ],
+                "parts": [{"text": m["content"]}],
             }
         )
 
     r = requests.post(
-        (
-            "https://generativelanguage.googleapis.com/"
-            f"v1beta/models/{model}:generateContent"
-        ),
-        params={
-            "key": api_key
-        },
+        (f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"),
+        params={"key": api_key},
         json={
-            "system_instruction": {
-                "parts": [
-                    {
-                        "text": SYSTEM_PROMPT
-                    }
-                ]
-            },
+            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents,
             "generationConfig": {
                 "temperature": 0.4,
@@ -361,21 +313,11 @@ def _ask_google(
     candidates = body.get("candidates", [])
 
     if not candidates:
-        raise ValueError(
-            "Google returned no candidates."
-        )
+        raise ValueError("Google returned no candidates.")
 
-    parts = (
-        candidates[0]
-        .get("content", {})
-        .get("parts", [])
-    )
+    parts = candidates[0].get("content", {}).get("parts", [])
 
-    text = "\n".join(
-        p.get("text", "")
-        for p in parts
-        if p.get("text")
-    )
+    text = "\n".join(p.get("text", "") for p in parts if p.get("text"))
 
     return text.strip()
 
@@ -400,15 +342,7 @@ def ask(
     provider = detect_provider(api_key)
 
     if not provider:
-        raise ValueError(
-
-                "API key format not recognised. "
-                "Expected sk-ant-…, "
-                "xai-…, "
-                "AIza…, "
-                "or sk-… prefix."
-
-        )
+        raise ValueError("API key format not recognised. Expected sk-ant-…, xai-…, AIza…, or sk-… prefix.")
 
     history = history or []
 
@@ -416,7 +350,6 @@ def ask(
 
     # Previous turns
     for i, turn in enumerate(history):
-
         q = turn.get("q", "")
         a = turn.get("a", "")
 
@@ -445,7 +378,6 @@ def ask(
 
     # Current question
     if not history:
-
         new_content = (
             "Here is the user's current portfolio "
             "as compact JSON:\n\n"
@@ -454,11 +386,7 @@ def ask(
         )
 
     else:
-        new_content = (
-            "User portfolio:\n\n"
-            f"```json\n{portfolio_json}\n```\n\n"
-            f"Question: {user_question}"
-)
+        new_content = f"User portfolio:\n\n```json\n{portfolio_json}\n```\n\nQuestion: {user_question}"
 
     messages.append(
         {
@@ -470,7 +398,6 @@ def ask(
     model = _MODELS[provider]
 
     if provider == "anthropic":
-
         raw = _ask_anthropic(
             api_key,
             model,
@@ -478,7 +405,6 @@ def ask(
         )
 
     elif provider == "xai":
-
         raw = _ask_openai_compatible(
             api_key,
             "https://api.x.ai/v1",
@@ -487,7 +413,6 @@ def ask(
         )
 
     elif provider == "google":
-
         raw = _ask_google(
             api_key,
             model,
@@ -495,7 +420,6 @@ def ask(
         )
 
     elif provider == "openai":
-
         raw = _ask_openai_compatible(
             api_key,
             "https://api.openai.com/v1",
@@ -504,9 +428,7 @@ def ask(
         )
 
     else:
-        raise ValueError(
-            f"Unhandled provider: {provider}"
-        )
+        raise ValueError(f"Unhandled provider: {provider}")
 
     return _strip_followups(raw)
 
@@ -516,7 +438,7 @@ def ask(
 LLM_PROMPTS = [
     "Give me a full portfolio health check in 5 bullet points.",
     "What would a conservative investor change about this portfolio?",
-    "If I had €500 more to invest today, where would you put it and why?",
+    "If I had CHF 500 more to invest today, where would you put it and why?",
     "Explain my biggest holding like I'm new to investing.",
     "What are three realistic risks in the next 12 months for this portfolio?",
     "Draft a one-sentence thesis for each of my holdings.",
@@ -524,6 +446,7 @@ LLM_PROMPTS = [
 
 
 # ── Compact context builder ───────────────────────────────────────────────────
+
 
 def build_portfolio_context(
     port,
@@ -535,82 +458,29 @@ def build_portfolio_context(
     compact = {}
 
     if port:
-
         summary = port.get("summary", {}) or {}
 
         compact["summary"] = {
-            "total_value_eur":
-                summary.get("total_value"),
-
-            "unrealised_pnl_eur":
-                summary.get(
-                    "total_unrealized_pnl"
-                ),
-
-            "unrealised_pnl_pct":
-                summary.get(
-                    "total_pnl_pct"
-                ),
-
-            "num_positions":
-                summary.get(
-                    "num_positions"
-                ),
-
-            "largest_position":
-                summary.get(
-                    "largest_position"
-                ),
-
-            "largest_position_pct":
-                summary.get(
-                    "largest_position_pct"
-                ),
+            "total_value_eur": summary.get("total_value"),
+            "unrealised_pnl_eur": summary.get("total_unrealized_pnl"),
+            "unrealised_pnl_pct": summary.get("total_pnl_pct"),
+            "num_positions": summary.get("num_positions"),
+            "largest_position": summary.get("largest_position"),
+            "largest_position_pct": summary.get("largest_position_pct"),
         }
 
         compact["positions"] = [
             {
-                "ticker":
-                    p.get("ticker"),
-
-                "qty":
-                    p.get("quantity"),
-
-                "avg_cost":
-                    p.get("avg_cost"),
-
-                "price":
-                    p.get(
-                        "current_price"
-                    ),
-
-                "market_value":
-                    p.get(
-                        "market_value"
-                    ),
-
-                "pnl":
-                    p.get(
-                        "unrealized_pnl"
-                    ),
-
-                "pnl_pct":
-                    p.get(
-                        "pnl_pct"
-                    ),
-
-                "weight_pct":
-                    p.get(
-                        "allocation_pct"
-                    ),
+                "ticker": p.get("ticker"),
+                "qty": p.get("quantity"),
+                "avg_cost": p.get("avg_cost"),
+                "price": p.get("current_price"),
+                "market_value": p.get("market_value"),
+                "pnl": p.get("unrealized_pnl"),
+                "pnl_pct": p.get("pnl_pct"),
+                "weight_pct": p.get("allocation_pct"),
             }
-            for p in port.get(
-                "positions",
-                []
-            )
+            for p in port.get("positions", [])
         ]
 
-    return json.dumps(
-        compact,
-        separators=(",", ":")
-    )
+    return json.dumps(compact, separators=(",", ":"))

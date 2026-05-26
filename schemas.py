@@ -29,6 +29,7 @@ class PositionData(TypedDict):
 
 
 class SummaryData(TypedDict):
+    total_invested: float
     total_value: float
     total_unrealized_pnl: float
     num_positions: int
@@ -41,10 +42,10 @@ class SummaryData(TypedDict):
 
 
 class AccountData(TypedDict, total=False):
-    cash_eur: float
+    cash_chf: float
     net_liquidation: float
     gross_position_value: float
-    eurusd_rate: float
+    usdchf_rate: float
     daily_pnl: float | None
 
 

@@ -36,8 +36,8 @@ from config import cfg
 
 log = logging.getLogger(__name__)
 
-_MAX_BACKOFF   = 120   # seconds
-_BASE_BACKOFF  =   5   # seconds
+_MAX_BACKOFF = 120  # seconds
+_BASE_BACKOFF = 5  # seconds
 
 # Common IBKR API ports. The configured port is tried first; if it fails we
 # fall through the rest so the dashboard works with either IB Gateway or TWS,
@@ -47,19 +47,19 @@ _FALLBACK_PORTS = [7497, 4002, 7496, 4001]
 
 class _IBKRConnection:
     def __init__(self):
-        self._ib:        IB | None               = None
-        self._loop:      asyncio.AbstractEventLoop | None = None
-        self._connected: bool                    = False
-        self._fetch_lock   = threading.Lock()
-        self._conn_attempt = 0   # counts consecutive failures for back-off
-        self._retry_event: asyncio.Event | None = None   # wakes the reconnect sleep
+        self._ib: IB | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._connected: bool = False
+        self._fetch_lock = threading.Lock()
+        self._conn_attempt = 0  # counts consecutive failures for back-off
+        self._retry_event: asyncio.Event | None = None  # wakes the reconnect sleep
 
         # Config (set by start())
-        self._host               = '127.0.0.1'
-        self._port               = 4002
-        self._client_id          = 1
-        self._readonly           = True
-        self._reconnect_delay    = _BASE_BACKOFF
+        self._host = "127.0.0.1"
+        self._port = 4002
+        self._client_id = 1
+        self._readonly = True
+        self._reconnect_delay = _BASE_BACKOFF
         self._heartbeat_interval = 30
 
     # ── Public interface ──────────────────────────────────────────────────────
@@ -70,19 +70,24 @@ class _IBKRConnection:
 
     @property
     def status(self) -> str:
-        return 'connected' if self.is_connected else 'disconnected'
+        return "connected" if self.is_connected else "disconnected"
 
-    def start(self, host='127.0.0.1', port=4002, client_id=1,
-              readonly=True, reconnect_delay=_BASE_BACKOFF,
-              heartbeat_interval=30):
-        self._host               = host
-        self._port               = port
-        self._client_id          = client_id
-        self._readonly           = readonly
-        self._reconnect_delay    = reconnect_delay   # used as base delay
+    def start(
+        self,
+        host="127.0.0.1",
+        port=4002,
+        client_id=1,
+        readonly=True,
+        reconnect_delay=_BASE_BACKOFF,
+        heartbeat_interval=30,
+    ):
+        self._host = host
+        self._port = port
+        self._client_id = client_id
+        self._readonly = readonly
+        self._reconnect_delay = reconnect_delay  # used as base delay
         self._heartbeat_interval = heartbeat_interval
-        t = threading.Thread(target=self._thread_main,
-                             name='ib-async-loop', daemon=True)
+        t = threading.Thread(target=self._thread_main, name="ib-async-loop", daemon=True)
         t.start()
 
     def fetch_all_data(self) -> dict | None:
@@ -94,8 +99,7 @@ class _IBKRConnection:
             return None
         future: concurrent.futures.Future | None = None
         try:
-            future = asyncio.run_coroutine_threadsafe(
-                self._do_fetch(), self._loop)
+            future = asyncio.run_coroutine_threadsafe(self._do_fetch(), self._loop)
             return future.result(timeout=60)
         except concurrent.futures.TimeoutError:
             # TWS hung for >60 s. Cancel the coroutine on the IB loop so it
@@ -127,7 +131,7 @@ class _IBKRConnection:
         background thread hasn't started yet or is already connected.
         """
         loop = self._loop
-        evt  = self._retry_event
+        evt = self._retry_event
         if loop is None or evt is None:
             return
         self._conn_attempt = 0
@@ -161,9 +165,9 @@ class _IBKRConnection:
         dashboard works regardless of which client the user is running.
         """
         while True:
-            connected_ib: IB | None     = None
-            disc_event:   asyncio.Event = asyncio.Event()
-            on_disc                     = None
+            connected_ib: IB | None = None
+            disc_event: asyncio.Event = asyncio.Event()
+            on_disc = None
 
             for port in self._candidate_ports():
                 ib = IB()
@@ -175,17 +179,19 @@ class _IBKRConnection:
                 ib.disconnectedEvent += _on_disconnect
 
                 try:
-                    log.info("Connecting to IBKR at %s:%d (attempt %d) …",
-                             self._host, port, self._conn_attempt + 1)
+                    log.info(
+                        "Connecting to IBKR at %s:%d (attempt %d) …", self._host, port, self._conn_attempt + 1
+                    )
                     await ib.connectAsync(
-                        self._host, port,
+                        self._host,
+                        port,
                         clientId=self._client_id,
                         timeout=15,
                         readonly=self._readonly,
                     )
                     connected_ib = ib
-                    disc_event   = ev
-                    on_disc      = _on_disconnect
+                    disc_event = ev
+                    on_disc = _on_disconnect
                     log.info("Connected to IBKR on port %d ✓", port)
                     break
                 except asyncio.CancelledError:
@@ -213,8 +219,8 @@ class _IBKRConnection:
                 await self._sleep_or_retry(delay)
                 continue
 
-            self._ib           = connected_ib
-            self._connected    = True
+            self._ib = connected_ib
+            self._connected = True
             self._conn_attempt = 0
             try:
                 await self._heartbeat_loop(connected_ib, disc_event)
@@ -223,7 +229,7 @@ class _IBKRConnection:
                 raise
             finally:
                 self._connected = False
-                self._ib        = None
+                self._ib = None
                 if on_disc is not None:
                     connected_ib.disconnectedEvent -= on_disc
                 try:
@@ -247,12 +253,11 @@ class _IBKRConnection:
         interval = self._heartbeat_interval
         while not disc_event.is_set():
             try:
-                await asyncio.wait_for(
-                    disc_event.wait(), timeout=interval)
+                await asyncio.wait_for(disc_event.wait(), timeout=interval)
                 # disc_event fired inside wait_for → exit
                 return
             except TimeoutError:
-                pass   # interval elapsed, time to ping
+                pass  # interval elapsed, time to ping
 
             if not ib.isConnected():
                 log.warning("Heartbeat: IB reports disconnected")
@@ -279,36 +284,38 @@ class _IBKRConnection:
                 return None
 
         # ── Portfolio positions (synchronous TWS cache — fast) ────────────────
-        items     = ib.portfolio()
+        items = ib.portfolio()
         positions = []
         contracts = []
 
         for item in items:
             market_price = item.marketPrice
-            price_stale  = market_price != market_price   # True when NaN
+            price_stale = market_price != market_price  # True when NaN
             if price_stale:
                 if item.position and item.marketValue == item.marketValue:
                     market_price = item.marketValue / item.position
                 else:
                     market_price = item.averageCost
 
-            positions.append({
-                'ticker':         item.contract.symbol,
-                'conId':          item.contract.conId,
-                'quantity':       item.position,
-                'avg_cost':       round(item.averageCost, 2),
-                'current_price':  round(market_price, 2),
-                'market_value':   round(item.marketValue, 2),
-                'unrealized_pnl': round(item.unrealizedPNL, 2),
-                'realized_pnl':   round(item.realizedPNL, 2),
-                'price_stale':    price_stale,
-            })
+            positions.append(
+                {
+                    "ticker": item.contract.symbol,
+                    "conId": item.contract.conId,
+                    "quantity": item.position,
+                    "avg_cost": round(item.averageCost, 2),
+                    "current_price": round(market_price, 2),
+                    "market_value": round(item.marketValue, 2),
+                    "unrealized_pnl": round(item.unrealizedPNL, 2),
+                    "realized_pnl": round(item.realizedPNL, 2),
+                    "price_stale": price_stale,
+                }
+            )
             contracts.append(item.contract)
 
         # ── Account values (synchronous TWS cache — fast) ─────────────────────
         av = ib.accountValues()
 
-        def get_av(tag, currency='USD'):
+        def get_av(tag, currency="USD"):
             for v in av:
                 if v.tag == tag and v.currency == currency:
                     try:
@@ -317,37 +324,42 @@ class _IBKRConnection:
                         return 0.0
             return 0.0
 
-        # Detect the account's base currency (e.g. 'EUR', 'USD', 'GBP').
+        # Detect the account's base currency (e.g. 'CHF', 'USD', 'GBP').
         # BaseCurrency is a string tag — its value is the ISO code, not a number.
-        base_ccy = 'EUR'
+        base_ccy = "CHF"
         for v in av:
-            if v.tag == 'BaseCurrency' and v.value:
+            if v.tag == "BaseCurrency" and v.value:
                 base_ccy = v.value.strip().upper()
                 break
 
         account = {
-            'base_currency':        base_ccy,
-            'cash_usd':             get_av('CashBalance',        'USD'),
-            'cash_base':            get_av('TotalCashValue',      base_ccy),
-            'buying_power':         get_av('BuyingPower',         base_ccy),
-            'net_liquidation':      get_av('NetLiquidation',      base_ccy),
-            'available_funds':      get_av('AvailableFunds',      base_ccy),
-            'excess_liquidity':     get_av('ExcessLiquidity',     base_ccy),
-            'gross_position_value': get_av('GrossPositionValue',  base_ccy),
-            'maint_margin':         get_av('MaintMarginReq',      base_ccy),
-            'init_margin':          get_av('InitMarginReq',       base_ccy),
-            'cushion':              get_av('Cushion',             ''),
-            'leverage':             get_av('Leverage',            ''),
-            'equity_with_loan':     get_av('EquityWithLoanValue', base_ccy),
-            'sma':                  get_av('SMA',                 base_ccy),
-            'day_trades_remaining': get_av('DayTradesRemaining',  ''),
-            'eurusd_rate':          cfg['display']['eurusd_fallback'],
+            "base_currency": base_ccy,
+            "cash_usd": get_av("CashBalance", "USD"),
+            "cash_base": get_av("TotalCashValue", base_ccy),
+            "buying_power": get_av("BuyingPower", base_ccy),
+            "net_liquidation": get_av("NetLiquidation", base_ccy),
+            "available_funds": get_av("AvailableFunds", base_ccy),
+            "excess_liquidity": get_av("ExcessLiquidity", base_ccy),
+            "gross_position_value": get_av("GrossPositionValue", base_ccy),
+            "maint_margin": get_av("MaintMarginReq", base_ccy),
+            "init_margin": get_av("InitMarginReq", base_ccy),
+            "cushion": get_av("Cushion", ""),
+            "leverage": get_av("Leverage", ""),
+            "equity_with_loan": get_av("EquityWithLoanValue", base_ccy),
+            "sma": get_av("SMA", base_ccy),
+            "day_trades_remaining": get_av("DayTradesRemaining", ""),
+            "usdchf_rate": cfg["display"]["usdchf_fallback"],
         }
 
         if not contracts:
-            account['daily_pnl'] = 0.0
-            return {'positions': positions, 'market_data': {}, 'div_data': {},
-                    'trades': [], 'account': account}
+            account["daily_pnl"] = 0.0
+            return {
+                "positions": positions,
+                "market_data": {},
+                "div_data": {},
+                "trades": [],
+                "account": account,
+            }
 
         # Request delayed market data type once (sync, fast) before parallel fetches
         try:
@@ -372,10 +384,7 @@ class _IBKRConnection:
         # Returns (div_dict, range_dict) so the caller can merge range into market_data.
         async def _fetch_dividends():
             try:
-                div_tickers = [
-                    ib.reqMktData(c, genericTickList='59,165', snapshot=False)
-                    for c in contracts
-                ]
+                div_tickers = [ib.reqMktData(c, genericTickList="59,165", snapshot=False) for c in contracts]
                 # Poll in 0.1 s steps up to 1.5 s; exit early once every ticker
                 # has received its 52-week range tick (tick 165).  Stocks with no
                 # 52w data from IBKR will always be NaN — we fall through the
@@ -384,22 +393,22 @@ class _IBKRConnection:
                     await asyncio.sleep(0.1)
                     if all(t.low52week == t.low52week for t in div_tickers):
                         break
-                div_result   = {}
+                div_result = {}
                 range_result = {}
                 for t in div_tickers:
                     sym = t.contract.symbol
-                    d   = t.dividends
+                    d = t.dividends
                     if d and (d.next12Months or d.past12Months):
                         div_result[sym] = {
-                            'past_12m':    safe(d.past12Months),
-                            'next_12m':    safe(d.next12Months),
-                            'next_date':   d.nextDate.isoformat() if d.nextDate else None,
-                            'next_amount': safe(d.nextAmount),
+                            "past_12m": safe(d.past12Months),
+                            "next_12m": safe(d.next12Months),
+                            "next_date": d.nextDate.isoformat() if d.nextDate else None,
+                            "next_amount": safe(d.nextAmount),
                         }
-                    low  = safe(t.low52week)
+                    low = safe(t.low52week)
                     high = safe(t.high52week)
                     if low and high:
-                        range_result[sym] = {'low_52w': low, 'high_52w': high}
+                        range_result[sym] = {"low_52w": low, "high_52w": high}
                     ib.cancelMktData(t.contract)
                 log.debug("Dividend data fetched for: %s", list(div_result.keys()))
                 log.debug("52w range fetched for: %s", list(range_result.keys()))
@@ -408,43 +417,46 @@ class _IBKRConnection:
                 log.warning("Dividend data fetch failed: %s", e)
                 return {}, {}
 
-        # Chain C: EUR/USD live rate
+        # Chain C: USD/CHF live rate (we display in CHF)
         async def _fetch_fx():
             try:
-                eurusd = Forex('EURUSD')
-                await ib.qualifyContractsAsync(eurusd)
-                [fx_ticker] = await ib.reqTickersAsync(eurusd)
+                usdchf = Forex("USDCHF")
+                await ib.qualifyContractsAsync(usdchf)
+                [fx_ticker] = await ib.reqTickersAsync(usdchf)
                 rate = fx_ticker.marketPrice()
                 if rate and rate > 0 and rate == rate:
-                    log.debug("EUR/USD rate: %.6f", rate)
+                    log.debug("USD/CHF rate: %.6f", rate)
                     return round(rate, 6)
             except Exception as e:
-                log.warning("EUR/USD rate fetch failed, using fallback %.4f: %s",
-                            cfg['display']['eurusd_fallback'], e)
+                log.warning(
+                    "USD/CHF rate fetch failed, using fallback %.4f: %s", cfg["display"]["usdchf_fallback"], e
+                )
             return None
 
         # Chain E: recent trade executions (IBKR server caps history at ~7 days)
         async def _fetch_trades():
             try:
                 filt = ExecutionFilter()
-                filt.time = (datetime.now() - timedelta(days=7)).strftime('%Y%m%d-%H:%M:%S')
+                filt.time = (datetime.now() - timedelta(days=7)).strftime("%Y%m%d-%H:%M:%S")
                 fills = await ib.reqExecutionsAsync(filt)
                 result = []
                 for f in fills:
                     try:
                         shares = float(f.execution.shares)
-                        price  = float(f.execution.price)
-                        result.append({
-                            'ticker': f.contract.symbol,
-                            'side':   'BUY' if f.execution.side == 'BOT' else 'SELL',
-                            'shares': shares,
-                            'price':  round(price, 4),
-                            'time':   f.execution.time.isoformat() if f.execution.time else None,
-                            'value':  round(shares * price, 2),
-                        })
+                        price = float(f.execution.price)
+                        result.append(
+                            {
+                                "ticker": f.contract.symbol,
+                                "side": "BUY" if f.execution.side == "BOT" else "SELL",
+                                "shares": shares,
+                                "price": round(price, 4),
+                                "time": f.execution.time.isoformat() if f.execution.time else None,
+                                "value": round(shares * price, 2),
+                            }
+                        )
                     except Exception:
                         continue
-                result.sort(key=lambda x: x['time'] or '')
+                result.sort(key=lambda x: x["time"] or "")
                 log.debug("Fetched %d trade fills", len(result))
                 return result
             except Exception as e:
@@ -454,8 +466,8 @@ class _IBKRConnection:
         # Chain D: daily P&L
         async def _fetch_pnl():
             try:
-                acct_name = av[0].account if av else ''
-                pnl_obj   = ib.reqPnL(acct_name)
+                acct_name = av[0].account if av else ""
+                pnl_obj = ib.reqPnL(acct_name)
                 # Poll in 0.05 s steps up to 0.5 s; exit as soon as dailyPnL arrives.
                 for _ in range(10):
                     await asyncio.sleep(0.05)
@@ -483,16 +495,16 @@ class _IBKRConnection:
             for t in raw_tickers:
                 sym = t.contract.symbol
                 market_data[sym] = {
-                    'bid':        safe(t.bid),
-                    'ask':        safe(t.ask),
-                    'open':       safe(t.open),
-                    'high':       safe(t.high),
-                    'low':        safe(t.low),
-                    'prev_close': safe(t.close),
-                    'volume':     safe(t.volume),
-                    'low_52w':    safe(t.low52week),
-                    'high_52w':   safe(t.high52week),
-                    'vwap':       safe(t.vwap),
+                    "bid": safe(t.bid),
+                    "ask": safe(t.ask),
+                    "open": safe(t.open),
+                    "high": safe(t.high),
+                    "low": safe(t.low),
+                    "prev_close": safe(t.close),
+                    "volume": safe(t.volume),
+                    "low_52w": safe(t.low52week),
+                    "high_52w": safe(t.high52week),
+                    "vwap": safe(t.vwap),
                 }
 
         # Merge 52-week range from the generic-tick subscription (tick 165).
@@ -500,23 +512,22 @@ class _IBKRConnection:
         # the dedicated reqMktData subscription above is the reliable source.
         for sym, rng in (range_data or {}).items():
             if sym in market_data:
-                if not market_data[sym].get('low_52w'):
-                    market_data[sym]['low_52w'] = rng['low_52w']
-                if not market_data[sym].get('high_52w'):
-                    market_data[sym]['high_52w'] = rng['high_52w']
+                if not market_data[sym].get("low_52w"):
+                    market_data[sym]["low_52w"] = rng["low_52w"]
+                if not market_data[sym].get("high_52w"):
+                    market_data[sym]["high_52w"] = rng["high_52w"]
 
         if fx_rate is not None:
-            account['eurusd_rate'] = fx_rate
-        account['daily_pnl'] = daily_pnl if isinstance(daily_pnl, (int, float)) else 0.0
+            account["usdchf_rate"] = fx_rate
+        account["daily_pnl"] = daily_pnl if isinstance(daily_pnl, (int, float)) else 0.0
 
         return {
-            'positions':   positions,
-            'market_data': market_data,
-            'div_data':    div_data if isinstance(div_data, dict) else {},
-            'trades':      trades if isinstance(trades, list) else [],
-            'account':     account,
+            "positions": positions,
+            "market_data": market_data,
+            "div_data": div_data if isinstance(div_data, dict) else {},
+            "trades": trades if isinstance(trades, list) else [],
+            "account": account,
         }
-
 
 
 # ── Module-level singleton ────────────────────────────────────────────────────
@@ -527,8 +538,8 @@ _conn = _IBKRConnection()
 # mock payload instead of talking to TWS. Toggled at startup via DEMO_MODE env
 # var or at runtime from the dashboard UI.
 _demo_mode = False
-_demo_portfolio_id = 'balanced'  # active demo portfolio; see demo_data.DEMO_PORTFOLIOS
-_conn_params: dict | None = None   # saved at startup; used by ensure_connection_started()
+_demo_portfolio_id = "balanced"  # active demo portfolio; see demo_data.DEMO_PORTFOLIOS
+_conn_params: dict | None = None  # saved at startup; used by ensure_connection_started()
 
 
 def set_demo_mode(on: bool) -> None:
@@ -551,28 +562,44 @@ def get_demo_portfolio() -> str:
     return _demo_portfolio_id
 
 
-def save_connection_params(host='127.0.0.1', port=4002, client_id=1,
-                           readonly=True, reconnect_delay=_BASE_BACKOFF,
-                           heartbeat_interval=30):
+def save_connection_params(
+    host="127.0.0.1",
+    port=4002,
+    client_id=1,
+    readonly=True,
+    reconnect_delay=_BASE_BACKOFF,
+    heartbeat_interval=30,
+):
     """Store connection parameters without starting the thread.
     Called at startup in demo mode so that ensure_connection_started() can
     bring the thread up later when the user exits demo and clicks Retry.
     """
     global _conn_params
     _conn_params = dict(
-        host=host, port=port, client_id=client_id,
-        readonly=readonly, reconnect_delay=reconnect_delay,
+        host=host,
+        port=port,
+        client_id=client_id,
+        readonly=readonly,
+        reconnect_delay=reconnect_delay,
         heartbeat_interval=heartbeat_interval,
     )
 
 
-def start_connection(host='127.0.0.1', port=4002, client_id=1,
-                     readonly=True, reconnect_delay=_BASE_BACKOFF,
-                     heartbeat_interval=30):
+def start_connection(
+    host="127.0.0.1",
+    port=4002,
+    client_id=1,
+    readonly=True,
+    reconnect_delay=_BASE_BACKOFF,
+    heartbeat_interval=30,
+):
     """Save params and immediately launch the background IB thread."""
     save_connection_params(
-        host=host, port=port, client_id=client_id,
-        readonly=readonly, reconnect_delay=reconnect_delay,
+        host=host,
+        port=port,
+        client_id=client_id,
+        readonly=readonly,
+        reconnect_delay=reconnect_delay,
         heartbeat_interval=heartbeat_interval,
     )
     _conn.start(**_conn_params)
@@ -597,13 +624,14 @@ def ensure_connection_started():
 def fetch_all_data() -> dict | None:
     if _demo_mode:
         from demo_data import build_demo_payload
+
         return build_demo_payload(_demo_portfolio_id)
     return _conn.fetch_all_data()
 
 
 def connection_status() -> str:
     if _demo_mode:
-        return 'connected'
+        return "connected"
     return _conn.status
 
 

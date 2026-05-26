@@ -20,33 +20,44 @@ from styles import (
     TEXT_SECTION_LABEL,
 )
 
-# Single reference for the EUR/USD fallback rate (used when IBKR hasn't
-# delivered a live rate yet). Reads from cfg so EURUSD_FALLBACK env var
+# Single reference for the USD/CHF fallback rate (used when IBKR hasn't
+# delivered a live rate yet). Reads from cfg so USDCHF_FALLBACK env var
 # or config.yaml overrides flow through without touching any callback.
-EURUSD_FALLBACK: float = cfg['display']['eurusd_fallback']
+USDCHF_FALLBACK: float = cfg["display"]["usdchf_fallback"]
 
 # Currency symbol map — covers the most common IBKR account currencies.
 _CCY_SYMBOLS: dict[str, str] = {
-    'USD': '$', 'EUR': '€', 'GBP': '£', 'CHF': 'Fr ',
-    'CAD': 'C$', 'AUD': 'A$', 'JPY': '¥', 'HKD': 'HK$',
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "CHF": "Fr ",
+    "CAD": "C$",
+    "AUD": "A$",
+    "JPY": "¥",
+    "HKD": "HK$",
 }
 
 
 def ccy_symbol(ccy: str) -> str:
     """Return the display symbol for an ISO currency code (e.g. 'EUR' → '€')."""
-    return _CCY_SYMBOLS.get((ccy or 'USD').upper(), (ccy or 'USD') + ' ')
+    return _CCY_SYMBOLS.get((ccy or "USD").upper(), (ccy or "USD") + " ")
 
 
-def to_base(usd_val: float, rate: float, base_ccy: str = 'EUR') -> float:
+def to_base(usd_val: float, rate: float, base_ccy: str = "CHF") -> float:
     """
     Convert a USD-denominated value to the account's base currency.
-    - EUR base: divide by EUR/USD rate
-    - USD base: return as-is (already in base)
-    - Other:    return as-is (no rate available — caller displays USD)
+    The `rate` parameter is expected to be the number of base currency
+    units per 1 USD (e.g. USD/CHF -> CHF per USD). Conversion rules:
+    - USD base: return as-is (already in USD)
+    - CHF base: multiply by USD/CHF rate (USD -> CHF)
+    - EUR base: divide by EUR/USD rate (backwards-compatible if EUR rate provided)
+    - Other/unknown: return usd_val
     """
-    if not base_ccy or base_ccy == 'USD' or not rate:
+    if not base_ccy or base_ccy == "USD" or not rate:
         return usd_val
-    if base_ccy == 'EUR':
+    if base_ccy == "CHF":
+        return usd_val * rate
+    if base_ccy == "EUR":
         return usd_val / rate
     return usd_val
 
@@ -66,32 +77,42 @@ def section_label(text):
 
 
 def make_table(cols, rows):
-    header = html.Tr([
-        html.Th(c, style={**TABLE_HEADER_CELL,
-                          'textAlign': 'right' if i > 0 else 'left'})
-        for i, c in enumerate(cols)
-    ])
-    return html.Table([html.Thead(header), html.Tbody(rows)],
-                      style=TABLE_WRAPPER)
+    header = html.Tr(
+        [
+            html.Th(c, style={**TABLE_HEADER_CELL, "textAlign": "right" if i > 0 else "left"})
+            for i, c in enumerate(cols)
+        ]
+    )
+    return html.Table([html.Thead(header), html.Tbody(rows)], style=TABLE_WRAPPER)
 
 
 def badge(text, color, bg, border, className=None):
-    return html.Span(text, className=className, style={
-        'fontSize': '14px', 'color': color, 'background': bg,
-        'padding': '4px 10px', 'borderRadius': '20px',
-        'border': f'0.5px solid {border}',
-    })
+    return html.Span(
+        text,
+        className=className,
+        style={
+            "fontSize": "14px",
+            "color": color,
+            "background": bg,
+            "padding": "4px 10px",
+            "borderRadius": "20px",
+            "border": f"0.5px solid {border}",
+        },
+    )
 
 
 def status_banner(icon, title, body, color):
-    return html.Div([
-        html.Div(icon, style={'fontSize': '32px', 'marginBottom': '14px'}),
-        html.P(title, style=TEXT_HEADING),
-        html.P(body,  style=TEXT_BODY_MUTED),
-    ], style={
-        'textAlign':    'center',
-        'padding':      '48px 32px',
-        'background':   color,
-        'borderRadius': '14px',
-        'border':       f'0.5px solid {COLOR_BORDER}',
-    })
+    return html.Div(
+        [
+            html.Div(icon, style={"fontSize": "32px", "marginBottom": "14px"}),
+            html.P(title, style=TEXT_HEADING),
+            html.P(body, style=TEXT_BODY_MUTED),
+        ],
+        style={
+            "textAlign": "center",
+            "padding": "48px 32px",
+            "background": color,
+            "borderRadius": "14px",
+            "border": f"0.5px solid {COLOR_BORDER}",
+        },
+    )

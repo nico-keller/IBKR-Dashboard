@@ -12,7 +12,7 @@ from datetime import datetime
 import pandas as pd
 from dash import Input, Output, State, dcc, no_update
 
-from dashboard_core.helpers import EURUSD_FALLBACK, ccy_symbol, to_base
+from dashboard_core.helpers import USDCHF_FALLBACK, ccy_symbol, to_base
 from ibkr_client import is_demo_mode
 from styles import (
     COLOR_BAD_DEEP,
@@ -23,20 +23,20 @@ from styles import (
 )
 
 # Reportlab needs actual hex values — CSS variables don't work with colors.HexColor().
-_PDF_SURFACE      = '#f5f5f5'
-_PDF_SURFACE_SOFT = '#fafafa'
-_PDF_BORDER       = '#e0e0e0'
+_PDF_SURFACE = "#f5f5f5"
+_PDF_SURFACE_SOFT = "#fafafa"
+_PDF_BORDER = "#e0e0e0"
 
 
 def register(app):
     @app.callback(
-        Output('download-pdf', 'data'),
-        Input('export-pdf-btn', 'n_clicks'),
-        State('portfolio-data', 'data'),
+        Output("download-pdf", "data"),
+        Input("export-pdf-btn", "n_clicks"),
+        State("portfolio-data", "data"),
         prevent_initial_call=True,
     )
     def export_pdf(_, data):
-        if not data or 'positions' not in data:
+        if not data or "positions" not in data:
             return no_update
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
@@ -44,19 +44,19 @@ def register(app):
         from reportlab.lib.units import mm
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-        df       = pd.DataFrame(data['positions'])
-        s        = data.get('summary', {})
-        a        = data.get('account', {})
-        rate     = a.get('eurusd_rate', EURUSD_FALLBACK)
-        base_ccy = a.get('base_currency', 'EUR')
-        sym      = ccy_symbol(base_ccy)
-        sec_ccy  = 'USD' if base_ccy != 'USD' else 'EUR'
-        sec_sym  = ccy_symbol(sec_ccy)
+        df = pd.DataFrame(data["positions"])
+        s = data.get("summary", {})
+        a = data.get("account", {})
+        rate = a.get("usdchf_rate", USDCHF_FALLBACK)
+        base_ccy = a.get("base_currency", "CHF")
+        sym = ccy_symbol(base_ccy)
+        sec_ccy = "USD" if base_ccy != "USD" else "EUR"
+        sec_sym = ccy_symbol(sec_ccy)
 
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-                                leftMargin=20*mm, rightMargin=20*mm,
-                                topMargin=20*mm, bottomMargin=20*mm)
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=20 * mm, bottomMargin=20 * mm
+        )
         styles = getSampleStyleSheet()
         story = []
 
@@ -64,148 +64,194 @@ def register(app):
 
         # Title
         title_text = "Portfolio Snapshot — DEMO MODE" if demo else "Portfolio Snapshot"
-        story.append(Paragraph(title_text, ParagraphStyle(
-            'title', parent=styles['Heading1'], fontSize=18, spaceAfter=4)))
-        story.append(Paragraph(
-            f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            ParagraphStyle('sub', parent=styles['Normal'], fontSize=9,
-                           textColor=colors.HexColor('#888888'), spaceAfter=14)))
+        story.append(
+            Paragraph(
+                title_text, ParagraphStyle("title", parent=styles["Heading1"], fontSize=18, spaceAfter=4)
+            )
+        )
+        story.append(
+            Paragraph(
+                f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                ParagraphStyle(
+                    "sub",
+                    parent=styles["Normal"],
+                    fontSize=9,
+                    textColor=colors.HexColor("#888888"),
+                    spaceAfter=14,
+                ),
+            )
+        )
         if demo:
-            story.append(Paragraph(
-                "Sample portfolio — not real trading data.",
-                ParagraphStyle('demo', parent=styles['Normal'], fontSize=9,
-                               textColor=colors.HexColor(COLOR_WARN_DEEP),
-                               backColor=colors.HexColor(COLOR_WARN_BG),
-                               borderColor=colors.HexColor(COLOR_WARN_BORDER),
-                               borderWidth=0.5, borderPadding=6,
-                               spaceAfter=12)))
+            story.append(
+                Paragraph(
+                    "Sample portfolio — not real trading data.",
+                    ParagraphStyle(
+                        "demo",
+                        parent=styles["Normal"],
+                        fontSize=9,
+                        textColor=colors.HexColor(COLOR_WARN_DEEP),
+                        backColor=colors.HexColor(COLOR_WARN_BG),
+                        borderColor=colors.HexColor(COLOR_WARN_BORDER),
+                        borderWidth=0.5,
+                        borderPadding=6,
+                        spaceAfter=12,
+                    ),
+                )
+            )
 
         # Summary table
-        total_val   = s.get('total_value', 0)
-        unreal_pnl  = s.get('total_unrealized_pnl', 0)
-        real_pnl    = s.get('total_realized_pnl', 0) or 0
-        daily_pnl   = a.get('daily_pnl') or s.get('total_daily_pnl', 0) or 0
+        total_val = s.get("total_value", 0)
+        unreal_pnl = s.get("total_unrealized_pnl", 0)
+        real_pnl = s.get("total_realized_pnl", 0) or 0
+        daily_pnl = a.get("daily_pnl") or s.get("total_daily_pnl", 0) or 0
+
         def _base(v):
             return f"{sym}{to_base(v, rate, base_ccy):,.2f}"
+
         def _base_signed(v):
             return f"{sym}{to_base(v, rate, base_ccy):+,.2f}"
+
         def _sec(v):
-            sec_val = v / rate if base_ccy == 'USD' else v * rate
+            # rate is base-per-USD (e.g. CHF per USD). When converting to USD
+            # from a non-USD base divide by the rate. When base is USD multiply.
+            if base_ccy == "USD":
+                sec_val = v * rate if rate else v
+            else:
+                sec_val = v / rate if rate else v
             return f"{sec_sym}{sec_val:,.2f}"
 
         summary_data = [
-            ['Metric', base_ccy, sec_ccy],
-            ['Total Value',    _base(total_val),         _sec(total_val)],
-            ['Unrealized P&L', _base_signed(unreal_pnl), _sec(unreal_pnl)],
-            ['Realized P&L',   _base_signed(real_pnl),   _sec(real_pnl)],
-            ["Today's P&L",    _base_signed(daily_pnl),  _sec(daily_pnl)],
-            ['Cash',           f"{sym}{a.get('cash_base', 0):,.2f}",
-                               f"${a.get('cash_usd', 0) or 0:,.2f}"],
+            ["Metric", base_ccy, sec_ccy],
+            ["Total Value", _base(total_val), _sec(total_val)],
+            ["Unrealized P&L", _base_signed(unreal_pnl), _sec(unreal_pnl)],
+            ["Realized P&L", _base_signed(real_pnl), _sec(real_pnl)],
+            ["Today's P&L", _base_signed(daily_pnl), _sec(daily_pnl)],
+            ["Cash", f"{sym}{a.get('cash_base', 0):,.2f}", f"${a.get('cash_usd', 0) or 0:,.2f}"],
         ]
-        t = Table(summary_data, colWidths=[80*mm, 40*mm, 40*mm])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
-            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE',   (0, 0), (-1, -1), 9),
-            ('ALIGN',      (1, 0), (-1, -1), 'RIGHT'),
-            ('GRID',       (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(_PDF_SURFACE_SOFT)]),
-            ('TOPPADDING',  (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
+        t = Table(summary_data, colWidths=[80 * mm, 40 * mm, 40 * mm])
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_PDF_SURFACE_SOFT)]),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(t)
-        story.append(Spacer(1, 4*mm))
+        story.append(Spacer(1, 4 * mm))
 
         # Income summary — one-liner showing projected dividends, yield, and
         # how many holdings actually pay. Hidden when no holdings pay anything.
-        div_data   = data.get('div_data') or {}
-        qty_by_tk  = dict(zip(df['ticker'], df['quantity'], strict=False))
-        annual_usd = sum(
-            qty_by_tk.get(tk, 0) * float(d.get('next_12m') or 0)
-            for tk, d in div_data.items()
-        )
+        div_data = data.get("div_data") or {}
+        qty_by_tk = dict(zip(df["ticker"], df["quantity"], strict=False))
+        annual_usd = sum(qty_by_tk.get(tk, 0) * float(d.get("next_12m") or 0) for tk, d in div_data.items())
         if annual_usd > 0 and total_val > 0:
             annual_base = to_base(annual_usd, rate, base_ccy)
-            yield_pct   = (annual_base / total_val) * 100
-            payers      = sum(1 for d in div_data.values() if (d.get('next_12m') or 0) > 0)
-            total_hold  = len(df)
-            story.append(Paragraph(
-                f"Projected 12-month dividends: <b>{sym}{annual_base:,.0f}</b> &nbsp;·&nbsp; "
-                f"Portfolio yield: <b>{yield_pct:.2f}%</b> &nbsp;·&nbsp; "
-                f"{payers} of {total_hold} holdings pay",
-                ParagraphStyle('income', parent=styles['Normal'], fontSize=9,
-                               textColor=colors.HexColor('#444444'),
-                               backColor=colors.HexColor(_PDF_SURFACE_SOFT),
-                               borderColor=colors.HexColor(_PDF_BORDER),
-                               borderWidth=0.5, borderPadding=6, spaceAfter=6),
-            ))
-        story.append(Spacer(1, 4*mm))
+            yield_pct = (annual_base / total_val) * 100
+            payers = sum(1 for d in div_data.values() if (d.get("next_12m") or 0) > 0)
+            total_hold = len(df)
+            story.append(
+                Paragraph(
+                    f"Projected 12-month dividends: <b>{sym}{annual_base:,.0f}</b> &nbsp;·&nbsp; "
+                    f"Portfolio yield: <b>{yield_pct:.2f}%</b> &nbsp;·&nbsp; "
+                    f"{payers} of {total_hold} holdings pay",
+                    ParagraphStyle(
+                        "income",
+                        parent=styles["Normal"],
+                        fontSize=9,
+                        textColor=colors.HexColor("#444444"),
+                        backColor=colors.HexColor(_PDF_SURFACE_SOFT),
+                        borderColor=colors.HexColor(_PDF_BORDER),
+                        borderWidth=0.5,
+                        borderPadding=6,
+                        spaceAfter=6,
+                    ),
+                )
+            )
+        story.append(Spacer(1, 4 * mm))
 
         # Best / worst performer callout
-        best   = s.get('best_performer', '—')
-        worst  = s.get('worst_performer', '—')
-        best_row  = df[df['ticker'] == best].iloc[0]  if best  != '—' and best  in df['ticker'].values else None
-        worst_row = df[df['ticker'] == worst].iloc[0] if worst != '—' and worst in df['ticker'].values else None
-        best_str  = f"{best} ({best_row['pnl_pct']:+.2f}%)"   if best_row  is not None else best
+        best = s.get("best_performer", "—")
+        worst = s.get("worst_performer", "—")
+        best_row = df[df["ticker"] == best].iloc[0] if best != "—" and best in df["ticker"].values else None
+        worst_row = (
+            df[df["ticker"] == worst].iloc[0] if worst != "—" and worst in df["ticker"].values else None
+        )
+        best_str = f"{best} ({best_row['pnl_pct']:+.2f}%)" if best_row is not None else best
         worst_str = f"{worst} ({worst_row['pnl_pct']:+.2f}%)" if worst_row is not None else worst
         perf_data = [
-            ['Best Performer', 'Worst Performer'],
+            ["Best Performer", "Worst Performer"],
             [best_str, worst_str],
         ]
-        pt = Table(perf_data, colWidths=[82*mm, 82*mm])
-        pt.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
-            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE',      (0, 0), (-1, -1), 9),
-            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
-            ('GRID',          (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
-            ('TEXTCOLOR',     (0, 1), (0, 1), colors.HexColor(COLOR_GOOD_DEEP)),  # best = green
-            ('TEXTCOLOR',     (1, 1), (1, 1), colors.HexColor(COLOR_BAD_DEEP)),  # worst = red
-            ('FONTNAME',      (0, 1), (-1, 1), 'Helvetica-Bold'),
-            ('TOPPADDING',    (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
+        pt = Table(perf_data, colWidths=[82 * mm, 82 * mm])
+        pt.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
+                    ("TEXTCOLOR", (0, 1), (0, 1), colors.HexColor(COLOR_GOOD_DEEP)),  # best = green
+                    ("TEXTCOLOR", (1, 1), (1, 1), colors.HexColor(COLOR_BAD_DEEP)),  # worst = red
+                    ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(pt)
-        story.append(Spacer(1, 10*mm))
+        story.append(Spacer(1, 10 * mm))
 
         # Holdings table — includes daily change
-        story.append(Paragraph("Holdings", ParagraphStyle(
-            'h2', parent=styles['Heading2'], fontSize=12, spaceAfter=6)))
-        hold_data = [['Ticker', 'Qty', 'Avg Cost', 'Price', 'Day %', 'Mkt Value', 'P&L %', 'Weight']]
+        story.append(
+            Paragraph("Holdings", ParagraphStyle("h2", parent=styles["Heading2"], fontSize=12, spaceAfter=6))
+        )
+        hold_data = [["Ticker", "Qty", "Avg Cost", "Price", "Day %", "Mkt Value", "P&L %", "Weight"]]
         for _, row in df.iterrows():
-            day_pct = row.get('daily_change_pct')
-            day_str = f"{day_pct:+.2f}%" if pd.notna(day_pct) and day_pct is not None else '—'
-            hold_data.append([
-                row['ticker'],
-                str(int(row['quantity'])),
-                f"${row['avg_cost']:,.2f}",
-                f"${row['current_price']:,.2f}",
-                day_str,
-                f"${row['market_value']:,.2f}",
-                f"{row['pnl_pct']:+.2f}%",
-                f"{row['allocation_pct']:.1f}%",
-            ])
-        ht = Table(hold_data, colWidths=[20*mm, 12*mm, 22*mm, 22*mm, 16*mm, 26*mm, 16*mm, 16*mm])
+            day_pct = row.get("daily_change_pct")
+            day_str = f"{day_pct:+.2f}%" if pd.notna(day_pct) and day_pct is not None else "—"
+            hold_data.append(
+                [
+                    row["ticker"],
+                    str(int(row["quantity"])),
+                    f"${row['avg_cost']:,.2f}",
+                    f"${row['current_price']:,.2f}",
+                    day_str,
+                    f"${row['market_value']:,.2f}",
+                    f"{row['pnl_pct']:+.2f}%",
+                    f"{row['allocation_pct']:.1f}%",
+                ]
+            )
+        ht = Table(
+            hold_data, colWidths=[20 * mm, 12 * mm, 22 * mm, 22 * mm, 16 * mm, 26 * mm, 16 * mm, 16 * mm]
+        )
         # colour positive/negative day % and P&L % cells per row
         ht_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
-            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE',   (0, 0), (-1, -1), 8),
-            ('ALIGN',      (1, 0), (-1, -1), 'RIGHT'),
-            ('ALIGN',      (0, 0), (0, -1), 'LEFT'),
-            ('GRID',       (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(_PDF_SURFACE_SOFT)]),
-            ('TOPPADDING',  (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_PDF_SURFACE)),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor(_PDF_BORDER)),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_PDF_SURFACE_SOFT)]),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]
         for i, row in enumerate(df.itertuples(), start=1):
-            day_pct = getattr(row, 'daily_change_pct', None)
+            day_pct = getattr(row, "daily_change_pct", None)
             if day_pct is not None and pd.notna(day_pct):
                 col = colors.HexColor(COLOR_GOOD_DEEP) if day_pct >= 0 else colors.HexColor(COLOR_BAD_DEEP)
-                ht_style.append(('TEXTCOLOR', (4, i), (4, i), col))
-            pnl = getattr(row, 'pnl_pct', 0) or 0
+                ht_style.append(("TEXTCOLOR", (4, i), (4, i), col))
+            pnl = getattr(row, "pnl_pct", 0) or 0
             col = colors.HexColor(COLOR_GOOD_DEEP) if pnl >= 0 else colors.HexColor(COLOR_BAD_DEEP)
-            ht_style.append(('TEXTCOLOR', (6, i), (6, i), col))
+            ht_style.append(("TEXTCOLOR", (6, i), (6, i), col))
         ht.setStyle(TableStyle(ht_style))
         story.append(ht)
 
