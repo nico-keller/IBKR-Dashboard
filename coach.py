@@ -204,15 +204,15 @@ def scenario_what_if(port, _intel, _val):
     top = positions[0]
     total_value = port["summary"].get("total_value", 0) or 1
 
-    # Convert SPPE (EUR) vs USD positions using the saved EUR/USD rate.
+    # Convert SPPE (CHF) vs USD positions using the saved USD/CHF rate.
     # portfolio-data positions store market_value in their native currency,
-    # so we don't know for sure — but account.gross_position_value is in EUR.
+    # so we don't know for sure — but account.gross_position_value is in CHF.
     # We approximate "impact on portfolio" as share * 20%.
     share = top.get("allocation_pct", 0) / 100.0
     impact_pct = share * 20.0
-    impact_eur = total_value * share * 0.20
+    impact_chf = total_value * share * 0.20
 
-    headline = f"If {top['ticker']} drops 20%, you'd lose about {_fmt_chf(impact_eur)}."
+    headline = f"If {top['ticker']} drops 20%, you'd lose about {_fmt_chf(impact_chf)}."
     body = [
         f"That's roughly {impact_pct:.1f}% of your total portfolio value.",
         "The rest of your holdings wouldn't automatically offset that — they move somewhat independently.",

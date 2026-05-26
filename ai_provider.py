@@ -28,10 +28,12 @@ SYSTEM_PROMPT = (
     "You are a friendly coach for a first-time investor. "
     "Write plain English. If you use any jargon (P/E, CAPE, beta, yield, hedge, "
     "drawdown, allocation), define it in one short sentence the first time it "
-    "appears. Keep answers under 350 words unless the user explicitly asks for "
-    "a long answer. Base every claim on the portfolio data the user provides — "
-    "never invent positions, prices, or numbers. If something isn't in the data, "
-    "say you don't know rather than guess.\n\n"
+    "appears. Give a complete answer rather than a short one, and use as many "
+    "words as needed unless the user asks for brevity. Use CHF for all money "
+    "references and never switch to euros unless the user explicitly asks for "
+    "euros. Base every claim on the portfolio data the user provides — never "
+    "invent positions, prices, or numbers. If something isn't in the data, say "
+    "you don't know rather than guess.\n\n"
     "After your answer, on a NEW final line write EXACTLY one JSON array with "
     "three short follow-up questions the user might ask next (max 8 words each, "
     "specific to this portfolio), prefixed with the literal token FOLLOWUPS: — "
@@ -229,7 +231,7 @@ def _ask_openai_compatible(
                 },
                 *messages,
             ],
-            "max_tokens": 900,
+            "max_tokens": 1600,
             "temperature": 0.4,
         },
         timeout=_TIMEOUT,
@@ -255,7 +257,7 @@ def _ask_anthropic(
         },
         json={
             "model": model,
-            "max_tokens": 900,
+            "max_tokens": 1600,
             "system": SYSTEM_PROMPT,
             "messages": messages,
         },
@@ -300,7 +302,7 @@ def _ask_google(
             "contents": contents,
             "generationConfig": {
                 "temperature": 0.4,
-                "maxOutputTokens": 900,
+                "maxOutputTokens": 1600,
             },
         },
         timeout=_TIMEOUT,
@@ -461,8 +463,8 @@ def build_portfolio_context(
         summary = port.get("summary", {}) or {}
 
         compact["summary"] = {
-            "total_value_eur": summary.get("total_value"),
-            "unrealised_pnl_eur": summary.get("total_unrealized_pnl"),
+            "total_value_chf": summary.get("total_value"),
+            "unrealised_pnl_chf": summary.get("total_unrealized_pnl"),
             "unrealised_pnl_pct": summary.get("total_pnl_pct"),
             "num_positions": summary.get("num_positions"),
             "largest_position": summary.get("largest_position"),
