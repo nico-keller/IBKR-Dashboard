@@ -76,3 +76,51 @@ class ValuationData(TypedDict, total=False):
     sp500_pe: dict
     cape: dict
     treasury: dict
+
+
+class CorrelationData(TypedDict):
+    tickers: list[str]
+    matrix: list[list[float]]
+
+
+class PortfolioAnalyticsMeta(TypedDict, total=False):
+    lookback_years: int
+    benchmark_ticker: str
+    risk_free_rate: float
+    max_weight: float
+    var_convention: str
+    coverage_pct: float
+    observations: int
+    eligible_tickers: list[str]
+    generated_at: str
+
+
+class PortfolioAnalyticsMetrics(TypedDict, total=False):
+    annual_return: float | None
+    annual_volatility: float | None
+    sharpe: float | None
+    sortino: float | None
+    diversification_ratio: float | None
+    hhi: float | None
+
+
+class PortfolioRiskMetrics(TypedDict, total=False):
+    annual_volatility: float | None
+    downside_deviation: float | None
+    max_drawdown: float | None
+    var_95: float | None
+    cvar_95: float | None
+    beta: float | None
+
+
+class PortfolioAnalyticsData(TypedDict):
+    status: str
+    messages: list[str]
+    tickers: list[str]
+    current_weights: dict[str, float]
+    min_vol_weights: dict[str, float] | None
+    max_sharpe_weights: dict[str, float] | None
+    metrics: PortfolioAnalyticsMetrics
+    risk: PortfolioRiskMetrics
+    correlation: CorrelationData | None
+    meta: PortfolioAnalyticsMeta

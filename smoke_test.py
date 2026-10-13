@@ -14,6 +14,7 @@ from coach import SCENARIOS, render_scenario
 from data_processor import get_summary, process_positions
 from demo_data import build_demo_payload
 from market_valuation import buffett_zone, cape_zone, pe_zone, treasury_zone
+from portfolio_analytics import get_portfolio_analytics
 
 _failed = 0
 
@@ -52,6 +53,18 @@ port = {
 for s in SCENARIOS:
     out = render_scenario(s['id'], port, {}, {})
     check(f'scenario {s["id"]} renders', out is not None)
+
+# 2b. Portfolio analytics work in deterministic demo mode (no network)
+analytics_payload = get_portfolio_analytics(port, demo_mode=True)
+check('portfolio analytics payload generated', bool(analytics_payload and analytics_payload.get('status') == 'ok'))
+check(
+    'portfolio analytics has VaR',
+    bool(
+        analytics_payload
+        and analytics_payload.get('risk')
+        and analytics_payload['risk'].get('var_95') is not None
+    ),
+)
 
 # 3. Cache round-trip (single-flight + diskcache fallback)
 val = cached_fetch(('smoke', 1), 60, lambda: 42)

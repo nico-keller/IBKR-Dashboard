@@ -44,6 +44,7 @@ Everything. The sample portfolio is a realistic multi-stock, multi-currency hold
 | Position detail | Click any row — stats, price chart, fundamentals signal grid, investment brief, ETF fund overview |
 | Market Intelligence | Sector / geography exposure, earnings calendar (real yfinance data for the sample tickers) |
 | Market Valuation – US | Buffett Indicator, S&P 500 P/E, Shiller CAPE, Yield Gap (live macro data) |
+| Portfolio Analytics | Deterministic optimization/risk analytics dataset generated locally (no network dependency) |
 | Dividends | Yield, projected income, payment schedule |
 | Portfolio Coach | All 5 rules-based scenarios run against the sample portfolio; LLM chat works if you paste an API key |
 | PDF export | Generates a snapshot of the demo portfolio |

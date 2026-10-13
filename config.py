@@ -39,6 +39,12 @@ _DEFAULTS: dict = {
     "display": {
         "usdchf_fallback": 0.92,
     },
+    "analytics": {
+        "lookback_years": 2,
+        "benchmark_ticker": "SPY",
+        "risk_free_rate": 0.0,
+        "max_weight": 0.40,
+    },
     "app": {
         "demo_mode": False,
     },
@@ -82,6 +88,17 @@ def _apply_env_overrides(cfg: dict) -> dict:
     # Display
     if env("USDCHF_FALLBACK"):
         cfg["display"]["usdchf_fallback"] = float(env("USDCHF_FALLBACK"))
+
+    # Portfolio analytics
+    if env("ANALYTICS_LOOKBACK_YEARS"):
+        cfg["analytics"]["lookback_years"] = max(1, int(env("ANALYTICS_LOOKBACK_YEARS")))
+    if env("ANALYTICS_BENCHMARK"):
+        cfg["analytics"]["benchmark_ticker"] = env("ANALYTICS_BENCHMARK")
+    if env("ANALYTICS_RISK_FREE_RATE"):
+        cfg["analytics"]["risk_free_rate"] = float(env("ANALYTICS_RISK_FREE_RATE"))
+    if env("ANALYTICS_MAX_WEIGHT"):
+        raw = float(env("ANALYTICS_MAX_WEIGHT"))
+        cfg["analytics"]["max_weight"] = min(max(raw, 0.05), 1.0)
 
     # App-wide
     if env("DEMO_MODE"):

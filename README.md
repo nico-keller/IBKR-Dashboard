@@ -49,6 +49,7 @@ Each installer creates a desktop shortcut so double-clicking starts the dashboar
 - **Allocation donut** + live EUR/USD rate from IBKR
 - **Market Valuation** — Buffett Indicator, S&P 500 P/E, Shiller CAPE (50-yr chart), 10-yr Treasury yield, colour-coded by zone
 - **Market Intelligence** — sector & geography exposure, earnings calendar with post-earnings moves
+- **Portfolio Analytics** — optimization (min-vol / max-Sharpe suggestions) and risk metrics (volatility, drawdown, VaR/CVaR, beta, correlation heatmap)
 - **Dividends** — yield per position, projected 12-month income, payment schedule
 - **Historical trades** — upload IBKR Transaction History CSV per position; BUY/SELL markers overlaid on price chart
 - **Portfolio Coach** — chat panel with 5 rules-based scenarios out of the box; optionally paste an Anthropic / xAI / OpenAI key for free-form chat
@@ -68,6 +69,10 @@ All settings can be set via `config.yaml` **or** environment variables (env wins
 | `DASH_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` in Docker) |
 | `DASH_PORT` | `8050` | HTTP port |
 | `REFRESH_INTERVAL` | `60` | Auto-refresh interval in seconds |
+| `ANALYTICS_LOOKBACK_YEARS` | `2` | Historical lookback window used by Portfolio Analytics |
+| `ANALYTICS_BENCHMARK` | `SPY` | Benchmark ticker for beta calculations |
+| `ANALYTICS_RISK_FREE_RATE` | `0.0` | Annual risk-free rate assumption used by Sharpe/Sortino |
+| `ANALYTICS_MAX_WEIGHT` | `0.40` | Per-position optimization cap (long-only constrained optimizer) |
 | `OPEN_BROWSER` | `1` | Set to `0` to skip browser launch |
 | `DEMO_MODE` | `0` | Set to `1` to start in demo mode without an IBKR connection |
 | `CONFIG_PATH` | `config.yaml` | Path to YAML config file |
@@ -94,6 +99,11 @@ All settings can be set via `config.yaml` **or** environment variables (env wins
 
 - The dashboard connects in **read-only mode** — it cannot place, modify, or cancel orders.
 - yfinance data is cached for 4 hours; IBKR market data refreshes every 60 seconds.
+- Portfolio Analytics uses adjusted-close daily returns (default lookback: 2 years, 252 trading-day annualisation, 0% risk-free by default) and reports **historical estimates only** — not investment advice.
+- VaR/CVaR are shown with a **positive-loss convention** (95% historical quantile and tail average).
+- Optimization is long-only with a per-position cap (default 40%). Results can be unavailable when history coverage is insufficient.
+- Mixed-currency portfolios are treated as-is (no FX-normalised return reconstruction for each ticker).
+- The interactive Portfolio Analytics section is currently **not included in PDF export**.
 
 ## More
 
