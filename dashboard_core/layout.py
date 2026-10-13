@@ -317,6 +317,14 @@ def build_layout(refresh_ms: int) -> html.Div:
                             "borderTop": f"0.5px solid {COLOR_BORDER_LIGHT}",
                         },
                     ),
+                    html.Div(
+                        id="portfolio-analytics-section",
+                        style={
+                            "marginTop": "32px",
+                            "paddingTop": "28px",
+                            "borderTop": f"0.5px solid {COLOR_BORDER_LIGHT}",
+                        },
+                    ),
                 ],
                 id="main-content-area",
             ),
@@ -341,6 +349,7 @@ def build_layout(refresh_ms: int) -> html.Div:
             dcc.Store(id="portfolio-data"),
             dcc.Store(id="market-intel-data"),
             dcc.Store(id="valuation-data"),
+            dcc.Store(id="portfolio-analytics-data"),
             dcc.Store(id="connection-status", data="loading"),
             dcc.Store(id="selected-ticker", data=None),
             dcc.Store(id="selected-period", data="1M"),

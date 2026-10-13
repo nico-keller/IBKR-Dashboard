@@ -12,6 +12,7 @@ from dashboard_core import detail as _detail_mod
 from dashboard_core import export as _export_mod
 from dashboard_core import intel as _intel_mod
 from dashboard_core import layout as _layout_mod
+from dashboard_core import portfolio_analytics as _portfolio_analytics_mod
 from dashboard_core import summary as _summary_mod
 from dashboard_core import valuation as _valuation_mod
 from styles import LINK_PILL
@@ -29,6 +30,7 @@ _summary_mod.register(app)
 _export_mod.register(app)
 _detail_mod.register(app)
 _intel_mod.register(app)
+_portfolio_analytics_mod.register(app)
 _valuation_mod.register(app)
 _coach_ui_mod.register(app)
 

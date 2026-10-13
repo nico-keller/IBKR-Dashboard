@@ -12,3 +12,9 @@ dashboard:
 
 display:
   usdchf_fallback: 0.92
+
+analytics:
+  lookback_years: 2
+  benchmark_ticker: SPY
+  risk_free_rate: 0.0
+  max_weight: 0.40

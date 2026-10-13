@@ -91,6 +91,7 @@ Useful commands:
 │   ├── detail.py         Position detail slide-out: stats, sparkline, trade CSV upload
 │   ├── intel.py          Toast, populate_market_intel store, sector/geo charts, earnings calendar
 │   ├── valuation.py      populate_valuation_data store, Buffett/CAPE/P-E/Treasury render
+│   ├── portfolio_analytics.py  populate + render Portfolio Analytics (risk + optimization)
 │   ├── coach_ui.py       AI Coach panel: threads, chat, preset scenarios, LLM integration
 │   ├── export.py         PDF export callback
 │   └── helpers.py        section_label, make_table, badge, status_banner, to_eur, EURUSD_FALLBACK
@@ -98,6 +99,7 @@ Useful commands:
 ├── analytics.py          Dividend data helpers (yfinance)
 ├── market_intel.py       Sector/geo exposure and earnings calendar (yfinance)
 ├── market_valuation.py   Macro indicators — Buffett, S&P 500 P/E, Shiller CAPE, 10-yr Treasury
+├── portfolio_analytics.py Portfolio optimization + risk metrics engine (cached history + demo fallback)
 ├── trade_history.py      CSV upload path for historical trades
 ├── coach.py              Rules-based Portfolio Coach scenarios (no network)
 ├── ai_provider.py        Optional LLM layer — Anthropic / xAI / OpenAI (BYO key)
@@ -152,3 +154,13 @@ The release workflow (`.github/workflows/release.yml`) will:
 | `DOCKERHUB_TOKEN` | Docker Hub [access token](https://app.docker.com/settings/personal-access-tokens) (read/write) |
 
 > Pushing changes to `.github/workflows/` requires a GitHub Personal Access Token with the `workflow` scope.
+
+## Portfolio Analytics methodology and limits
+
+- Uses adjusted-close daily history per held ticker (default lookback: 2 years) and a benchmark ticker (default `SPY`), aligned on common dates.
+- Portfolio returns are weighted by current market-value allocations, annualised with 252 trading days.
+- Metrics include annualised return/volatility, Sharpe, Sortino, diversification ratio, concentration (HHI), max drawdown, VaR(95%), CVaR/Expected Shortfall(95%), beta, and holdings correlation.
+- VaR/CVaR use a **positive loss** convention: VaR is the 95% historical loss quantile; CVaR is the average loss beyond that cutoff.
+- Optimized weights are long-only, sum to 100%, and obey a per-position cap (default 40%). When constraints are infeasible or data is insufficient, the UI shows a fallback state.
+- In demo mode, analytics history is deterministic and generated locally (no network dependency for tests/smoke checks).
+- The analytics section is interactive and currently not exported in the PDF report.
